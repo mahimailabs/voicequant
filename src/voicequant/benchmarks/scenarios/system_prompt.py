@@ -22,10 +22,11 @@ from typing import Any
 
 from rich.console import Console
 
-from voicequant.server.config import ServerConfig, GPU_CAPACITY_ESTIMATES
+from voicequant.server.config import ServerConfig
 
 try:
     import openai
+
     _HAS_OPENAI = True
 except ImportError:
     _HAS_OPENAI = False
@@ -101,7 +102,9 @@ _SYSTEM_PROMPT_TOKENS = 1500  # approximate
 _N_LAYERS = 32
 _N_HEADS = 32
 _HEAD_DIM = 128
-_FP16_BYTES_PER_TOKEN = 2 * _N_LAYERS * _N_HEADS * _HEAD_DIM * 2  # K+V, all layers/heads
+_FP16_BYTES_PER_TOKEN = (
+    2 * _N_LAYERS * _N_HEADS * _HEAD_DIM * 2
+)  # K+V, all layers/heads
 
 _CONVERSATION_TURNS = [
     {"role": "user", "content": "Hi, what's the weather like tomorrow?"},
@@ -188,13 +191,15 @@ class SystemPromptBenchmark:
             ttfb = ((first_token_time or t1) - t0) * 1000.0
             messages.append({"role": "assistant", "content": response_text})
 
-            turn_results.append({
-                "turn": turn_idx,
-                "ttfb_ms": round(ttfb, 2),
-                "total_latency_ms": round((t1 - t0) * 1000.0, 2),
-                "tokens_generated": tokens_generated,
-                "response": response_text,
-            })
+            turn_results.append(
+                {
+                    "turn": turn_idx,
+                    "ttfb_ms": round(ttfb, 2),
+                    "total_latency_ms": round((t1 - t0) * 1000.0, 2),
+                    "tokens_generated": tokens_generated,
+                    "response": response_text,
+                }
+            )
 
         return turn_results
 
@@ -225,7 +230,9 @@ class SystemPromptBenchmark:
         is_simulated = client is None
 
         if is_simulated:
-            console.print("[yellow]No live server detected -- using simulated results.[/yellow]")
+            console.print(
+                "[yellow]No live server detected -- using simulated results.[/yellow]"
+            )
 
         # Memory analysis for the system prompt alone
         fp16_prompt_bytes = _SYSTEM_PROMPT_TOKENS * _FP16_BYTES_PER_TOKEN
@@ -238,7 +245,9 @@ class SystemPromptBenchmark:
             "tq4_bytes": tq4_prompt_bytes,
             "tq4_mb": round(tq4_prompt_bytes / (1024 * 1024), 2),
             "compression_ratio": round(_compression_ratio("tq4"), 2),
-            "savings_mb": round((fp16_prompt_bytes - tq4_prompt_bytes) / (1024 * 1024), 2),
+            "savings_mb": round(
+                (fp16_prompt_bytes - tq4_prompt_bytes) / (1024 * 1024), 2
+            ),
         }
 
         console.print("\n[bold]System Prompt Memory[/bold]")
@@ -286,13 +295,15 @@ class SystemPromptBenchmark:
                 context += 15 + 25  # user + assistant tokens
                 ratio = _compression_ratio("tq4")
                 base_ttfb = 15.0 + (context / (ratio * 1000.0)) * 8.0
-                turn_results.append({
-                    "turn": turn_idx,
-                    "ttfb_ms": round(base_ttfb, 2),
-                    "total_latency_ms": round(base_ttfb + 25 * 10.0, 2),
-                    "tokens_generated": 25,
-                    "response": f"[simulated response for turn {turn_idx}]",
-                })
+                turn_results.append(
+                    {
+                        "turn": turn_idx,
+                        "ttfb_ms": round(base_ttfb, 2),
+                        "total_latency_ms": round(base_ttfb + 25 * 10.0, 2),
+                        "tokens_generated": 25,
+                        "response": f"[simulated response for turn {turn_idx}]",
+                    }
+                )
 
         return {
             "system_prompt_memory": system_prompt_memory,

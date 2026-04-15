@@ -11,8 +11,8 @@ from typing import Any
 import torch
 from rich.console import Console
 
-from voicequant.core.llm.engine import TurboQuantEngine
 from voicequant.core.llm.config import TurboQuantConfig
+from voicequant.core.llm.engine import TurboQuantEngine
 
 console = Console()
 
@@ -74,7 +74,9 @@ class TurboQuantWrapper:
         """
         return self.engine.build_cache(compressed)
 
-    def truncate_cache(self, compressed: dict[str, Any], seq_len: int) -> dict[str, Any]:
+    def truncate_cache(
+        self, compressed: dict[str, Any], seq_len: int
+    ) -> dict[str, Any]:
         """Truncate compressed cache to first seq_len tokens.
 
         Used when a voice agent user interrupts mid-generation to roll back.
@@ -119,8 +121,10 @@ class TurboQuantWrapper:
         Returns:
             Dict with fp16_sessions, tq_sessions, multiplier.
         """
-        available_gb = (gpu_memory_gb * self.config.gpu_memory_utilization) - model_memory_gb
-        available_bytes = available_gb * (1024 ** 3)
+        available_gb = (
+            gpu_memory_gb * self.config.gpu_memory_utilization
+        ) - model_memory_gb
+        available_bytes = available_gb * (1024**3)
 
         sizes = self.engine.compressed_size_bytes(avg_context_len)
         fp16_per_session = sizes["fp16_bytes"] * n_layers * n_heads
@@ -134,8 +138,8 @@ class TurboQuantWrapper:
             "tq_sessions": tq_sessions,
             "multiplier": tq_sessions / max(fp16_sessions, 1),
             "available_memory_gb": available_gb,
-            "fp16_per_session_mb": fp16_per_session / (1024 ** 2),
-            "tq_per_session_mb": tq_per_session / (1024 ** 2),
+            "fp16_per_session_mb": fp16_per_session / (1024**2),
+            "tq_per_session_mb": tq_per_session / (1024**2),
         }
 
     @torch.no_grad()
@@ -159,8 +163,12 @@ class TurboQuantWrapper:
         val_sims: list[float] = []
 
         for _ in range(n_trials):
-            K = torch.randn(seq_len, self.config.head_dim, device=self.device, dtype=torch.float16)
-            V = torch.randn(seq_len, self.config.head_dim, device=self.device, dtype=torch.float16)
+            K = torch.randn(
+                seq_len, self.config.head_dim, device=self.device, dtype=torch.float16
+            )
+            V = torch.randn(
+                seq_len, self.config.head_dim, device=self.device, dtype=torch.float16
+            )
 
             ck = self.engine.compress_keys_pytorch(K)
             cv = self.engine.compress_values_pytorch(V)

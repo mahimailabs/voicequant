@@ -142,7 +142,9 @@ def _extract_finding(name: str, result: dict[str, Any]) -> str:
     elif name == "ttfb":
         summary = result.get("summary", {})
         if summary:
-            max_ctx = max(summary.keys(), key=lambda k: int(k) if isinstance(k, (int, str)) else 0)
+            max_ctx = max(
+                summary.keys(), key=lambda k: int(k) if isinstance(k, (int, str)) else 0
+            )
             stats = summary[max_ctx]
             return (
                 f"At {_format_number(int(max_ctx))} context: "
@@ -194,7 +196,9 @@ def _generate_ttfb_section(result: dict[str, Any]) -> str:
     ctx_lengths = sorted(set(r["context_length"] for r in results_list))
 
     for ctx in ctx_lengths:
-        ctx_results = {r["kv_dtype"]: r for r in results_list if r["context_length"] == ctx}
+        ctx_results = {
+            r["kv_dtype"]: r for r in results_list if r["context_length"] == ctx
+        }
         fp16 = ctx_results.get("fp16", {}).get("ttfb_ms", 0)
         tq4 = ctx_results.get("tq4", {}).get("ttfb_ms", 0)
         tq3 = ctx_results.get("tq3", {}).get("ttfb_ms", 0)
@@ -227,7 +231,9 @@ def _generate_concurrent_section(result: dict[str, Any]) -> str:
     lines.append("")
     for dtype, point in bp.items():
         if point is not None:
-            lines.append(f"**{dtype} breaking point**: {point} sessions (p95 TTFB > 500ms)")
+            lines.append(
+                f"**{dtype} breaking point**: {point} sessions (p95 TTFB > 500ms)"
+            )
         else:
             lines.append(f"**{dtype}**: No breaking point found within tested range")
 
@@ -248,7 +254,9 @@ def _generate_quality_section(result: dict[str, Any]) -> str:
     tq4 = summary.get("tq4", {})
     tq3 = summary.get("tq3", {})
 
-    lines.append(f"| ROUGE-L | {tq4.get('avg_rouge_l', 0):.4f} | {tq3.get('avg_rouge_l', 0):.4f} |")
+    lines.append(
+        f"| ROUGE-L | {tq4.get('avg_rouge_l', 0):.4f} | {tq3.get('avg_rouge_l', 0):.4f} |"
+    )
     lines.append(
         f"| Cosine Similarity | {tq4.get('avg_cosine_similarity', 0):.4f} | "
         f"{tq3.get('avg_cosine_similarity', 0):.4f} |"
@@ -270,21 +278,25 @@ def _generate_system_prompt_section(result: dict[str, Any]) -> str:
     ]
 
     mem = result.get("system_prompt_memory", {})
-    lines.extend([
-        f"- **System prompt tokens**: {mem.get('system_prompt_tokens', 0):,}",
-        f"- **FP16 memory**: {mem.get('fp16_mb', 0):.2f} MB per session",
-        f"- **TQ4 memory**: {mem.get('tq4_mb', 0):.2f} MB per session",
-        f"- **Savings**: {mem.get('savings_mb', 0):.2f} MB per session "
-        f"({mem.get('compression_ratio', 0):.1f}x compression)",
-        "",
-    ])
+    lines.extend(
+        [
+            f"- **System prompt tokens**: {mem.get('system_prompt_tokens', 0):,}",
+            f"- **FP16 memory**: {mem.get('fp16_mb', 0):.2f} MB per session",
+            f"- **TQ4 memory**: {mem.get('tq4_mb', 0):.2f} MB per session",
+            f"- **Savings**: {mem.get('savings_mb', 0):.2f} MB per session "
+            f"({mem.get('compression_ratio', 0):.1f}x compression)",
+            "",
+        ]
+    )
 
     scaling = result.get("scaling", [])
     if scaling:
-        lines.extend([
-            "| Sessions | FP16 (GB) | TQ4 (GB) | Savings (GB) |",
-            "|----------|-----------|----------|--------------|",
-        ])
+        lines.extend(
+            [
+                "| Sessions | FP16 (GB) | TQ4 (GB) | Savings (GB) |",
+                "|----------|-----------|----------|--------------|",
+            ]
+        )
         for s in scaling:
             lines.append(
                 f"| {s['sessions']} | {s['fp16_total_gb']:.3f} | "
@@ -320,7 +332,9 @@ def _generate_tool_calling_section(result: dict[str, Any]) -> str:
         tq4_val = tq4.get(key, 0)
         delta = tq4_val - fp16_val
         sign = "+" if delta >= 0 else ""
-        lines.append(f"| {label} | {fp16_val:.1%} | {tq4_val:.1%} | {sign}{delta:.1%} |")
+        lines.append(
+            f"| {label} | {fp16_val:.1%} | {tq4_val:.1%} | {sign}{delta:.1%} |"
+        )
 
     return "\n".join(lines)
 
@@ -334,15 +348,17 @@ def _generate_gpu_recommendations() -> str:
 
     for gpu, info in _GPU_RECOMMENDATIONS.items():
         capacity = GPU_CAPACITY_ESTIMATES.get(gpu, {})
-        lines.extend([
-            f"### {gpu} ({info['memory']}) - {info['tier']}",
-            "",
-            f"- **FP16 sessions**: ~{capacity.get('fp16_sessions', '?')} at 4K context",
-            f"- **TQ4 sessions**: ~{capacity.get('tq4_sessions', '?')} at 4K context",
-            f"- **Max recommended context**: {info['max_context']}",
-            f"- **Recommendation**: {info['recommendation']}",
-            "",
-        ])
+        lines.extend(
+            [
+                f"### {gpu} ({info['memory']}) - {info['tier']}",
+                "",
+                f"- **FP16 sessions**: ~{capacity.get('fp16_sessions', '?')} at 4K context",
+                f"- **TQ4 sessions**: ~{capacity.get('tq4_sessions', '?')} at 4K context",
+                f"- **Max recommended context**: {info['max_context']}",
+                f"- **Recommendation**: {info['recommendation']}",
+                "",
+            ]
+        )
 
     return "\n".join(lines)
 

@@ -6,8 +6,6 @@ for voice AI inference by checking per-layer KV cache fidelity.
 
 from __future__ import annotations
 
-import torch
-import torch.nn.functional as F
 from rich.console import Console
 from rich.table import Table
 
@@ -43,7 +41,7 @@ def validate_model(
     config = TurboQuantConfig(kv_cache_dtype=kv_dtype)
     wrapper = TurboQuantWrapper(config=config, device="cpu")
 
-    console.print(f"\n[bold]VoiceQuant Quality Validation[/bold]")
+    console.print("\n[bold]VoiceQuant Quality Validation[/bold]")
     console.print(f"Model: {model}")
     console.print(f"TurboQuant: {bits}-bit | Threshold: {threshold}")
     console.print(f"Test: {seq_len} tokens x {n_trials} trials\n")
@@ -75,16 +73,22 @@ def validate_model(
     console.print(table)
 
     if all_pass:
-        console.print(f"\n[green bold]All checks passed. TQ{bits} is safe for {model}.[/green bold]\n")
+        console.print(
+            f"\n[green bold]All checks passed. TQ{bits} is safe for {model}.[/green bold]\n"
+        )
     else:
-        console.print(f"\n[red bold]Some checks failed. Consider using higher bit-width.[/red bold]\n")
+        console.print(
+            "\n[red bold]Some checks failed. Consider using higher bit-width.[/red bold]\n"
+        )
 
     capacity = wrapper.estimate_capacity(
         model_memory_gb=4.0,
         gpu_memory_gb=16.0,
         avg_context_len=4096,
     )
-    console.print(f"[dim]Estimated T4 (16GB) capacity: ~{capacity['tq_sessions']} concurrent sessions "
-                  f"({capacity['multiplier']:.1f}x vs FP16)[/dim]\n")
+    console.print(
+        f"[dim]Estimated T4 (16GB) capacity: ~{capacity['tq_sessions']} concurrent sessions "
+        f"({capacity['multiplier']:.1f}x vs FP16)[/dim]\n"
+    )
 
     return {"quality": results, "overall_pass": all_pass, "capacity": capacity}

@@ -1,6 +1,6 @@
 """Test MetricsCollector."""
 
-from voicequant.server.metrics import MetricsCollector, CompressionMetrics
+from voicequant.server.metrics import CompressionMetrics, MetricsCollector
 
 
 def test_collector_empty():

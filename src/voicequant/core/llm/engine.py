@@ -2,6 +2,7 @@
 # cutile first, pytorch fallback if unavailable
 
 import math
+
 import torch
 
 from .codebook import LloydMaxCodebook
@@ -25,18 +26,22 @@ def _qjl_matrix(d, seed, device="cpu"):
 
 
 class TurboQuantEngine:
-
-    def __init__(self, head_dim=HEAD_DIM, total_bits=DEFAULT_TOTAL_BITS,
-                 seed=DEFAULT_SEED, device="cpu"):
-        self.head_dim   = head_dim
+    def __init__(
+        self,
+        head_dim=HEAD_DIM,
+        total_bits=DEFAULT_TOTAL_BITS,
+        seed=DEFAULT_SEED,
+        device="cpu",
+    ):
+        self.head_dim = head_dim
         self.total_bits = total_bits
-        self.mse_bits   = max(total_bits - 1, 1)
-        self.device     = device
+        self.mse_bits = max(total_bits - 1, 1)
+        self.device = device
 
-        self.Pi  = _rotation_matrix(head_dim, seed, device)
+        self.Pi = _rotation_matrix(head_dim, seed, device)
         self.PiT = self.Pi.T.contiguous()
-        self.S   = _qjl_matrix(head_dim, seed, device)
-        self.ST  = self.S.T.contiguous()
+        self.S = _qjl_matrix(head_dim, seed, device)
+        self.ST = self.S.T.contiguous()
 
         self.key_codebook = LloydMaxCodebook(head_dim, self.mse_bits)
         self.val_codebook = LloydMaxCodebook(head_dim, total_bits)
@@ -63,6 +68,7 @@ class TurboQuantEngine:
     @torch.no_grad()
     def build_cache(self, compressed):
         from transformers import DynamicCache
+
         cache = DynamicCache()
         for li, (ck_list, cv_list) in enumerate(compressed["layers"]):
             k_heads = [ck["k_mse"] for ck in ck_list]
@@ -84,8 +90,9 @@ class TurboQuantEngine:
         return {"layers": new_layers}
 
     @torch.no_grad()
-    def generate(self, model, tokenizer, prompt, max_new_tokens=100,
-                 repetition_penalty=1.3):
+    def generate(
+        self, model, tokenizer, prompt, max_new_tokens=100, repetition_penalty=1.3
+    ):
         inputs = tokenizer(prompt, return_tensors="pt").to(self.device)
         out = model(**inputs, use_cache=True)
 
@@ -100,10 +107,12 @@ class TurboQuantEngine:
         all_ids.append(next_tok.item())
 
         for step in range(max_new_tokens - 1):
-            o = model(input_ids=next_tok, past_key_values=cache,
-                      position_ids=torch.tensor([[seq_len + step]],
-                                                device=self.device),
-                      use_cache=True)
+            o = model(
+                input_ids=next_tok,
+                past_key_values=cache,
+                position_ids=torch.tensor([[seq_len + step]], device=self.device),
+                use_cache=True,
+            )
             cache = o.past_key_values
             logits = o.logits[:, -1, :]
 
@@ -126,6 +135,7 @@ class TurboQuantEngine:
     @torch.no_grad()
     def auto_tune(self, seq_len=512, warmup=10, trials=50, quality_threshold=0.85):
         import time as _time
+
         import torch.nn.functional as F
 
         on_gpu = self.device != "cpu" and torch.cuda.is_available()
@@ -141,25 +151,49 @@ class TurboQuantEngine:
         cutile_ok = False
         if on_gpu:
             try:
-                probe = torch.randn(64, self.head_dim, device=self.device, dtype=torch.float16)
-                from .compress import turboquant_compress_2bit
+                probe = torch.randn(
+                    64, self.head_dim, device=self.device, dtype=torch.float16
+                )
                 import cuda.tile as ct
-                idx = torch.empty(64, self.head_dim, dtype=torch.uint8, device=self.device)
-                sgn = torch.empty(64, self.head_dim, dtype=torch.int8, device=self.device)
+
+                from .compress import turboquant_compress_2bit
+
+                idx = torch.empty(
+                    64, self.head_dim, dtype=torch.uint8, device=self.device
+                )
+                sgn = torch.empty(
+                    64, self.head_dim, dtype=torch.int8, device=self.device
+                )
                 nrm = torch.empty(64, dtype=torch.float16, device=self.device)
                 rnm = torch.empty(64, dtype=torch.float16, device=self.device)
                 c = self.key_codebook.centroids.tolist()
                 b = self.key_codebook.boundaries.tolist()
-                ct.launch(torch.cuda.current_stream(), (1, 1, 1),
-                          turboquant_compress_2bit, (
-                              probe, self.PiT.half(), self.Pi.half(), self.ST.half(),
-                              idx, sgn, nrm, rnm, *c, *b, 64))
+                ct.launch(
+                    torch.cuda.current_stream(),
+                    (1, 1, 1),
+                    turboquant_compress_2bit,
+                    (
+                        probe,
+                        self.PiT.half(),
+                        self.Pi.half(),
+                        self.ST.half(),
+                        idx,
+                        sgn,
+                        nrm,
+                        rnm,
+                        *c,
+                        *b,
+                        64,
+                    ),
+                )
                 torch.cuda.synchronize()
                 cutile_ok = True
             except Exception:
                 pass
 
-        print(f"cutile kernels: {'available' if cutile_ok else 'not available (pytorch fallback)'}\n")
+        print(
+            f"cutile kernels: {'available' if cutile_ok else 'not available (pytorch fallback)'}\n"
+        )
 
         K = torch.randn(seq_len, self.head_dim, device=self.device, dtype=torch.float16)
         V = torch.randn(seq_len, self.head_dim, device=self.device, dtype=torch.float16)
@@ -170,8 +204,11 @@ class TurboQuantEngine:
         for bits in [2, 3]:
             for backend in backends:
                 eng = TurboQuantEngine(
-                    head_dim=self.head_dim, total_bits=bits,
-                    seed=DEFAULT_SEED, device=self.device)
+                    head_dim=self.head_dim,
+                    total_bits=bits,
+                    seed=DEFAULT_SEED,
+                    device=self.device,
+                )
 
                 if backend == "pytorch":
                     compress_k = eng._compress_keys_pt
@@ -211,19 +248,29 @@ class TurboQuantEngine:
                 median_ms = sorted(times)[len(times) // 2]
 
                 k_cos = F.cosine_similarity(
-                    ck["k_mse"].float().flatten(), K.float().flatten(), dim=0).item()
+                    ck["k_mse"].float().flatten(), K.float().flatten(), dim=0
+                ).item()
                 v_cos = F.cosine_similarity(
-                    dv.float().flatten(), V.float().flatten(), dim=0).item()
+                    dv.float().flatten(), V.float().flatten(), dim=0
+                ).item()
 
                 ok = k_cos >= quality_threshold and v_cos >= quality_threshold
                 tag = "✓" if ok else "✗"
 
-                results.append({
-                    "total_bits": bits, "backend": backend,
-                    "median_ms": median_ms,
-                    "key_cos": k_cos, "val_cos": v_cos, "pass": ok})
-                print(f"  bits={bits}  {backend:<8s}  {median_ms:6.2f}ms  "
-                      f"key_cos={k_cos:.3f}  val_cos={v_cos:.3f}  {tag}")
+                results.append(
+                    {
+                        "total_bits": bits,
+                        "backend": backend,
+                        "median_ms": median_ms,
+                        "key_cos": k_cos,
+                        "val_cos": v_cos,
+                        "pass": ok,
+                    }
+                )
+                print(
+                    f"  bits={bits}  {backend:<8s}  {median_ms:6.2f}ms  "
+                    f"key_cos={k_cos:.3f}  val_cos={v_cos:.3f}  {tag}"
+                )
 
         valid = [r for r in results if r["pass"]]
         if not valid:
@@ -238,26 +285,34 @@ class TurboQuantEngine:
             self.key_codebook = LloydMaxCodebook(self.head_dim, self.mse_bits)
             self.val_codebook = LloydMaxCodebook(self.head_dim, self.total_bits)
 
-        self._force_pytorch = (best["backend"] == "pytorch")
+        self._force_pytorch = best["backend"] == "pytorch"
 
-        print(f"\n→ selected: {best['total_bits']}-bit {best['backend']} "
-              f"({best['median_ms']:.2f}ms, "
-              f"key={best['key_cos']:.3f}, val={best['val_cos']:.3f})")
+        print(
+            f"\n→ selected: {best['total_bits']}-bit {best['backend']} "
+            f"({best['median_ms']:.2f}ms, "
+            f"key={best['key_cos']:.3f}, val={best['val_cos']:.3f})"
+        )
         return results
 
     def compression_stats(self, past_key_values):
         kv_keys, kv_vals = self._extract_kv(past_key_values)
         n_layers = len(kv_keys)
-        n_heads  = kv_keys[0].shape[1]
-        seq_len  = kv_keys[0].shape[2]
+        n_heads = kv_keys[0].shape[1]
+        seq_len = kv_keys[0].shape[2]
 
-        fp16_bytes = sum(k.nbytes + v.nbytes for k, v in zip(kv_keys, kv_vals))
-        tq_bytes   = self._compressed_bytes(seq_len) * n_heads * n_layers
+        fp16_bytes = sum(
+            k.nbytes + v.nbytes for k, v in zip(kv_keys, kv_vals, strict=False)
+        )
+        tq_bytes = self._compressed_bytes(seq_len) * n_heads * n_layers
 
         return {
-            "seq_len": seq_len, "n_layers": n_layers, "n_heads": n_heads,
-            "fp16_bytes": fp16_bytes, "tq_bytes": tq_bytes,
-            "ratio": fp16_bytes / tq_bytes}
+            "seq_len": seq_len,
+            "n_layers": n_layers,
+            "n_heads": n_heads,
+            "fp16_bytes": fp16_bytes,
+            "tq_bytes": tq_bytes,
+            "ratio": fp16_bytes / tq_bytes,
+        }
 
     # internals
 
@@ -275,17 +330,18 @@ class TurboQuantEngine:
         if self._force_pytorch or self.total_bits != 3:
             return self._compress_keys(K), self._compress_values(V)
         try:
-            from .compress import turboquant_compress_kv_3bit
             import cuda.tile as ct
+
+            from .compress import turboquant_compress_kv_3bit
 
             seq_len, d = K.shape
 
             k_indices = torch.empty(seq_len, d, dtype=torch.uint8, device=K.device)
-            k_signs   = torch.empty(seq_len, d, dtype=torch.int8,  device=K.device)
-            k_norms   = torch.empty(seq_len, dtype=torch.float16,  device=K.device)
-            k_rnorms  = torch.empty(seq_len, dtype=torch.float16,  device=K.device)
+            k_signs = torch.empty(seq_len, d, dtype=torch.int8, device=K.device)
+            k_norms = torch.empty(seq_len, dtype=torch.float16, device=K.device)
+            k_rnorms = torch.empty(seq_len, dtype=torch.float16, device=K.device)
             v_indices = torch.empty(seq_len, d, dtype=torch.uint8, device=K.device)
-            v_norms   = torch.empty(seq_len, dtype=torch.float16,  device=K.device)
+            v_norms = torch.empty(seq_len, dtype=torch.float16, device=K.device)
 
             grid = (self._cdiv(seq_len, BLOCK_S), 1, 1)
             kc = self.key_codebook.centroids.tolist()
@@ -294,15 +350,38 @@ class TurboQuantEngine:
             vb = self.val_codebook.boundaries.tolist()
             stream = torch.cuda.current_stream()
 
-            ct.launch(stream, grid, turboquant_compress_kv_3bit, (
-                K, V, self.PiT.half(), self.Pi.half(), self.ST.half(),
-                k_indices, k_signs, k_norms, k_rnorms,
-                v_indices, v_norms,
-                *kc, *kb, *vc, *vb, seq_len))
+            ct.launch(
+                stream,
+                grid,
+                turboquant_compress_kv_3bit,
+                (
+                    K,
+                    V,
+                    self.PiT.half(),
+                    self.Pi.half(),
+                    self.ST.half(),
+                    k_indices,
+                    k_signs,
+                    k_norms,
+                    k_rnorms,
+                    v_indices,
+                    v_norms,
+                    *kc,
+                    *kb,
+                    *vc,
+                    *vb,
+                    seq_len,
+                ),
+            )
 
             k_mse = self._dequant_keys(k_indices, k_norms)
-            ck = {"indices": k_indices, "k_mse": k_mse, "qjl_signs": k_signs,
-                  "vec_norms": k_norms, "residual_norms": k_rnorms}
+            ck = {
+                "indices": k_indices,
+                "k_mse": k_mse,
+                "qjl_signs": k_signs,
+                "vec_norms": k_norms,
+                "residual_norms": k_rnorms,
+            }
             cv = {"indices": v_indices, "vec_norms": v_norms}
             return ck, cv
 
@@ -313,14 +392,15 @@ class TurboQuantEngine:
         if self._force_pytorch:
             return self._compress_keys_pt(K)
         try:
-            from .compress import turboquant_compress_2bit, turboquant_compress_3bit
             import cuda.tile as ct
+
+            from .compress import turboquant_compress_2bit, turboquant_compress_3bit
 
             seq_k, d = K.shape
             indices = torch.empty(seq_k, d, dtype=torch.uint8, device=K.device)
-            signs   = torch.empty(seq_k, d, dtype=torch.int8,  device=K.device)
-            norms   = torch.empty(seq_k, dtype=torch.float16,  device=K.device)
-            r_norms = torch.empty(seq_k, dtype=torch.float16,  device=K.device)
+            signs = torch.empty(seq_k, d, dtype=torch.int8, device=K.device)
+            norms = torch.empty(seq_k, dtype=torch.float16, device=K.device)
+            r_norms = torch.empty(seq_k, dtype=torch.float16, device=K.device)
 
             grid = (self._cdiv(seq_k, BLOCK_S), 1, 1)
             c = self.key_codebook.centroids.tolist()
@@ -328,19 +408,54 @@ class TurboQuantEngine:
             stream = torch.cuda.current_stream()
 
             if self.mse_bits == 2:
-                ct.launch(stream, grid, turboquant_compress_2bit, (
-                    K, self.PiT.half(), self.Pi.half(), self.ST.half(),
-                    indices, signs, norms, r_norms, *c, *b, seq_k))
+                ct.launch(
+                    stream,
+                    grid,
+                    turboquant_compress_2bit,
+                    (
+                        K,
+                        self.PiT.half(),
+                        self.Pi.half(),
+                        self.ST.half(),
+                        indices,
+                        signs,
+                        norms,
+                        r_norms,
+                        *c,
+                        *b,
+                        seq_k,
+                    ),
+                )
             elif self.mse_bits == 3:
-                ct.launch(stream, grid, turboquant_compress_3bit, (
-                    K, self.PiT.half(), self.Pi.half(), self.ST.half(),
-                    indices, signs, norms, r_norms, *c, *b, seq_k))
+                ct.launch(
+                    stream,
+                    grid,
+                    turboquant_compress_3bit,
+                    (
+                        K,
+                        self.PiT.half(),
+                        self.Pi.half(),
+                        self.ST.half(),
+                        indices,
+                        signs,
+                        norms,
+                        r_norms,
+                        *c,
+                        *b,
+                        seq_k,
+                    ),
+                )
             else:
                 return self._compress_keys_pt(K)
 
             k_mse = self._dequant_keys(indices, norms)
-            return {"indices": indices, "k_mse": k_mse, "qjl_signs": signs,
-                    "vec_norms": norms, "residual_norms": r_norms}
+            return {
+                "indices": indices,
+                "k_mse": k_mse,
+                "qjl_signs": signs,
+                "vec_norms": norms,
+                "residual_norms": r_norms,
+            }
         except (ImportError, RuntimeError):
             return self._compress_keys_pt(K)
 
@@ -348,13 +463,16 @@ class TurboQuantEngine:
         if self._force_pytorch:
             return self._compress_values_pt(V)
         try:
-            from .compress import (turboquant_compress_values_3bit,
-                                   turboquant_compress_values_2bit)
             import cuda.tile as ct
+
+            from .compress import (
+                turboquant_compress_values_2bit,
+                turboquant_compress_values_3bit,
+            )
 
             seq_v, d = V.shape
             indices = torch.empty(seq_v, d, dtype=torch.uint8, device=V.device)
-            norms   = torch.empty(seq_v, dtype=torch.float16,  device=V.device)
+            norms = torch.empty(seq_v, dtype=torch.float16, device=V.device)
 
             grid = (self._cdiv(seq_v, BLOCK_S), 1, 1)
             c = self.val_codebook.centroids.tolist()
@@ -362,11 +480,19 @@ class TurboQuantEngine:
             stream = torch.cuda.current_stream()
 
             if self.total_bits == 3:
-                ct.launch(stream, grid, turboquant_compress_values_3bit, (
-                    V, self.PiT.half(), indices, norms, *c, *b, seq_v))
+                ct.launch(
+                    stream,
+                    grid,
+                    turboquant_compress_values_3bit,
+                    (V, self.PiT.half(), indices, norms, *c, *b, seq_v),
+                )
             elif self.total_bits == 2:
-                ct.launch(stream, grid, turboquant_compress_values_2bit, (
-                    V, self.PiT.half(), indices, norms, *c, *b, seq_v))
+                ct.launch(
+                    stream,
+                    grid,
+                    turboquant_compress_values_2bit,
+                    (V, self.PiT.half(), indices, norms, *c, *b, seq_v),
+                )
             else:
                 return self._compress_values_pt(V)
 
@@ -378,26 +504,38 @@ class TurboQuantEngine:
         if self._force_pytorch:
             return self._decompress_values_pt(cv)
         try:
-            from .decompress import (turboquant_decompress_3bit,
-                                     turboquant_decompress_2bit)
             import cuda.tile as ct
 
+            from .decompress import (
+                turboquant_decompress_2bit,
+                turboquant_decompress_3bit,
+            )
+
             indices = cv["indices"]
-            norms   = cv["vec_norms"]
-            seq_v   = indices.shape[0]
-            output  = torch.empty(seq_v, self.head_dim, dtype=torch.float16,
-                                  device=indices.device)
+            norms = cv["vec_norms"]
+            seq_v = indices.shape[0]
+            output = torch.empty(
+                seq_v, self.head_dim, dtype=torch.float16, device=indices.device
+            )
 
             grid = (self._cdiv(seq_v, BLOCK_S), 1, 1)
             c = self.val_codebook.centroids.tolist()
             stream = torch.cuda.current_stream()
 
             if self.total_bits == 3:
-                ct.launch(stream, grid, turboquant_decompress_3bit, (
-                    indices, norms, self.Pi.half(), output, *c, seq_v))
+                ct.launch(
+                    stream,
+                    grid,
+                    turboquant_decompress_3bit,
+                    (indices, norms, self.Pi.half(), output, *c, seq_v),
+                )
             elif self.total_bits == 2:
-                ct.launch(stream, grid, turboquant_decompress_2bit, (
-                    indices, norms, self.Pi.half(), output, *c, seq_v))
+                ct.launch(
+                    stream,
+                    grid,
+                    turboquant_decompress_2bit,
+                    (indices, norms, self.Pi.half(), output, *c, seq_v),
+                )
             else:
                 return self._decompress_values_pt(cv)
             return output
@@ -423,9 +561,13 @@ class TurboQuantEngine:
         signs = torch.sign(residual @ self.ST.float()).to(torch.int8)
         signs[signs == 0] = 1
 
-        return {"indices": indices, "k_mse": k_mse.half(), "qjl_signs": signs,
-                "vec_norms": norms.squeeze(-1).half(),
-                "residual_norms": r_norms.half()}
+        return {
+            "indices": indices,
+            "k_mse": k_mse.half(),
+            "qjl_signs": signs,
+            "vec_norms": norms.squeeze(-1).half(),
+            "residual_norms": r_norms.half(),
+        }
 
     def _compress_values_pt(self, V):
         V_f = V.float()

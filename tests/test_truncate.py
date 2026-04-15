@@ -1,7 +1,6 @@
 """Test truncate_cache() correctness."""
 
 import torch
-import pytest
 
 from voicequant import TurboQuantEngine
 

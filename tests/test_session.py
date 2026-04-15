@@ -1,7 +1,7 @@
 """Test CacheSession lifecycle."""
 
-import torch
 import pytest
+import torch
 
 from voicequant import TurboQuantEngine
 from voicequant.cache import CacheSession

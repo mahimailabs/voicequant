@@ -10,7 +10,6 @@ All charts work without a GPU using analytical data from the engine.
 from __future__ import annotations
 
 import base64
-import io
 from pathlib import Path
 from typing import Any
 
@@ -20,9 +19,9 @@ console = Console()
 
 # Consistent color scheme across all charts
 COLORS = {
-    "fp16": "#e74c3c",   # red — baseline (uncompressed)
-    "tq4": "#2ecc71",    # green — recommended (4-bit)
-    "tq3": "#3498db",    # blue — aggressive (3-bit)
+    "fp16": "#e74c3c",  # red — baseline (uncompressed)
+    "tq4": "#2ecc71",  # green — recommended (4-bit)
+    "tq3": "#3498db",  # blue — aggressive (3-bit)
 }
 
 LABELS = {"fp16": "FP16", "tq4": "TQ4 (4-bit)", "tq3": "TQ3 (3-bit)"}
@@ -37,8 +36,10 @@ def _require_matplotlib():
     """Import matplotlib or raise a helpful error."""
     try:
         import matplotlib
+
         matplotlib.use("Agg")  # headless backend
         import matplotlib.pyplot as plt
+
         return plt
     except ImportError:
         console.print(
@@ -70,12 +71,12 @@ def _compute_analytical_data() -> dict[str, Any]:
 
     for ctx in context_lengths:
         fp16_bytes = ctx * _HEAD_DIM * 2 * 2 * _N_LAYERS * _N_HEADS  # K+V, fp16
-        memory_data["fp16"].append(fp16_bytes / (1024 ** 2))  # MB
+        memory_data["fp16"].append(fp16_bytes / (1024**2))  # MB
 
         for key in ["tq4", "tq3"]:
             sizes = engines[key].compressed_size_bytes(ctx)
             tq_bytes = sizes["compressed_bytes"] * _N_LAYERS * _N_HEADS
-            memory_data[key].append(tq_bytes / (1024 ** 2))
+            memory_data[key].append(tq_bytes / (1024**2))
             ratio_data[key].append(sizes["compression_ratio"])
 
     # Session scaling (memory at different session counts, fixed 4K context)
@@ -85,11 +86,11 @@ def _compute_analytical_data() -> dict[str, Any]:
     fp16_per_session = ctx_4k * _HEAD_DIM * 2 * 2 * _N_LAYERS * _N_HEADS
 
     for n in session_counts:
-        scaling_data["fp16"].append(fp16_per_session * n / (1024 ** 3))  # GB
+        scaling_data["fp16"].append(fp16_per_session * n / (1024**3))  # GB
         for key in ["tq4", "tq3"]:
             sizes = engines[key].compressed_size_bytes(ctx_4k)
             tq_per_session = sizes["compressed_bytes"] * _N_LAYERS * _N_HEADS
-            scaling_data[key].append(tq_per_session * n / (1024 ** 3))
+            scaling_data[key].append(tq_per_session * n / (1024**3))
 
     # TTFB vs context length (analytical model)
     ttfb_data: dict[str, list[float]] = {"fp16": [], "tq4": [], "tq3": []}
@@ -116,7 +117,7 @@ def _compute_analytical_data() -> dict[str, Any]:
         for key in ["fp16", "tq4"]:
             ratio = {"fp16": 1.0, "tq4": 16.0 / 3.0}[key]
             base = 20.0
-            contention = (n ** 1.3) * 2.0 / ratio
+            contention = (n**1.3) * 2.0 / ratio
             concurrent_ttfb[key].append(base + contention)
 
     return {
@@ -145,7 +146,10 @@ def _apply_style(plt, ax, title: str, xlabel: str, ylabel: str) -> None:
 
 
 def _chart_memory_per_session(
-    plt, data: dict, output_dir: Path, fmt: str,
+    plt,
+    data: dict,
+    output_dir: Path,
+    fmt: str,
 ) -> str:
     """Chart 1: KV cache memory at different session counts."""
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -166,13 +170,24 @@ def _chart_memory_per_session(
         for bar in bars:
             h = bar.get_height()
             if h > 0.5:
-                ax.text(bar.get_x() + bar.get_width() / 2, h + 0.1,
-                        f"{h:.1f}", ha="center", va="bottom", fontsize=8)
+                ax.text(
+                    bar.get_x() + bar.get_width() / 2,
+                    h + 0.1,
+                    f"{h:.1f}",
+                    ha="center",
+                    va="bottom",
+                    fontsize=8,
+                )
 
     ax.set_xticks([p + width for p in x_pos])
     ax.set_xticklabels([str(s) for s in counts])
-    _apply_style(plt, ax, "KV Cache Memory by Session Count (4K Context, 7B Model)",
-                 "Concurrent Sessions", "Total KV Cache Memory (GB)")
+    _apply_style(
+        plt,
+        ax,
+        "KV Cache Memory by Session Count (4K Context, 7B Model)",
+        "Concurrent Sessions",
+        "Total KV Cache Memory (GB)",
+    )
 
     path = str(output_dir / f"memory_per_session.{fmt}")
     fig.tight_layout()
@@ -182,7 +197,10 @@ def _chart_memory_per_session(
 
 
 def _chart_concurrent_sessions_by_gpu(
-    plt, data: dict, output_dir: Path, fmt: str,
+    plt,
+    data: dict,
+    output_dir: Path,
+    fmt: str,
 ) -> str:
     """Chart 2: Max concurrent sessions per GPU tier."""
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -194,22 +212,46 @@ def _chart_concurrent_sessions_by_gpu(
     y_pos = range(len(gpus))
     height = 0.35
 
-    bars_fp16 = ax.barh([p - height / 2 for p in y_pos], fp16_vals,
-                         height, label=LABELS["fp16"], color=COLORS["fp16"], alpha=0.85)
-    bars_tq4 = ax.barh([p + height / 2 for p in y_pos], tq4_vals,
-                        height, label=LABELS["tq4"], color=COLORS["tq4"], alpha=0.85)
+    bars_fp16 = ax.barh(
+        [p - height / 2 for p in y_pos],
+        fp16_vals,
+        height,
+        label=LABELS["fp16"],
+        color=COLORS["fp16"],
+        alpha=0.85,
+    )
+    bars_tq4 = ax.barh(
+        [p + height / 2 for p in y_pos],
+        tq4_vals,
+        height,
+        label=LABELS["tq4"],
+        color=COLORS["tq4"],
+        alpha=0.85,
+    )
 
-    for bar_fp, bar_tq, gpu in zip(bars_fp16, bars_tq4, gpus):
+    for bar_fp, bar_tq, gpu in zip(bars_fp16, bars_tq4, gpus, strict=False):
         multiplier = bar_tq.get_width() / max(bar_fp.get_width(), 1)
-        ax.text(bar_tq.get_width() + 3, bar_tq.get_y() + bar_tq.get_height() / 2,
-                f"{multiplier:.0f}x", ha="left", va="center",
-                fontweight="bold", fontsize=11, color=COLORS["tq4"])
+        ax.text(
+            bar_tq.get_width() + 3,
+            bar_tq.get_y() + bar_tq.get_height() / 2,
+            f"{multiplier:.0f}x",
+            ha="left",
+            va="center",
+            fontweight="bold",
+            fontsize=11,
+            color=COLORS["tq4"],
+        )
 
     mem_labels = [f"{data['gpu_capacity'][g]['memory_gb']}GB" for g in gpus]
     ax.set_yticks(list(y_pos))
-    ax.set_yticklabels([f"{g} ({m})" for g, m in zip(gpus, mem_labels)])
-    _apply_style(plt, ax, "Concurrent Voice Sessions per GPU (4K Context, 7B AWQ Model)",
-                 "Max Concurrent Sessions", "GPU")
+    ax.set_yticklabels([f"{g} ({m})" for g, m in zip(gpus, mem_labels, strict=False)])
+    _apply_style(
+        plt,
+        ax,
+        "Concurrent Voice Sessions per GPU (4K Context, 7B AWQ Model)",
+        "Max Concurrent Sessions",
+        "GPU",
+    )
 
     path = str(output_dir / f"concurrent_sessions_gpu.{fmt}")
     fig.tight_layout()
@@ -219,7 +261,10 @@ def _chart_concurrent_sessions_by_gpu(
 
 
 def _chart_ttfb_vs_context(
-    plt, data: dict, output_dir: Path, fmt: str,
+    plt,
+    data: dict,
+    output_dir: Path,
+    fmt: str,
 ) -> str:
     """Chart 3: TTFB vs context length with voice latency thresholds."""
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -227,22 +272,51 @@ def _chart_ttfb_vs_context(
     ctx_labels = [f"{c // 1024}K" for c in data["context_lengths"]]
 
     for key in ["fp16", "tq4", "tq3"]:
-        ax.plot(ctx_labels, data["ttfb_data"][key], "o-",
-                label=LABELS[key], color=COLORS[key], linewidth=2, markersize=6)
+        ax.plot(
+            ctx_labels,
+            data["ttfb_data"][key],
+            "o-",
+            label=LABELS[key],
+            color=COLORS[key],
+            linewidth=2,
+            markersize=6,
+        )
 
     # Voice latency thresholds
     ax.axhline(y=200, color="#f39c12", linestyle="--", alpha=0.7, linewidth=1)
-    ax.text(len(ctx_labels) - 0.5, 205, "200ms target", color="#f39c12",
-            fontsize=9, ha="right")
+    ax.text(
+        len(ctx_labels) - 0.5,
+        205,
+        "200ms target",
+        color="#f39c12",
+        fontsize=9,
+        ha="right",
+    )
     ax.axhline(y=500, color="#e74c3c", linestyle="--", alpha=0.5, linewidth=1)
-    ax.text(len(ctx_labels) - 0.5, 510, "500ms unusable", color="#e74c3c",
-            fontsize=9, ha="right")
+    ax.text(
+        len(ctx_labels) - 0.5,
+        510,
+        "500ms unusable",
+        color="#e74c3c",
+        fontsize=9,
+        ha="right",
+    )
 
-    ax.fill_between(range(len(ctx_labels)), 500, ax.get_ylim()[1] if ax.get_ylim()[1] > 500 else 600,
-                     alpha=0.05, color="red")
+    ax.fill_between(
+        range(len(ctx_labels)),
+        500,
+        ax.get_ylim()[1] if ax.get_ylim()[1] > 500 else 600,
+        alpha=0.05,
+        color="red",
+    )
 
-    _apply_style(plt, ax, "Time to First Token vs Context Length",
-                 "Context Length (tokens)", "TTFB (ms)")
+    _apply_style(
+        plt,
+        ax,
+        "Time to First Token vs Context Length",
+        "Context Length (tokens)",
+        "TTFB (ms)",
+    )
 
     path = str(output_dir / f"ttfb_vs_context.{fmt}")
     fig.tight_layout()
@@ -252,7 +326,10 @@ def _chart_ttfb_vs_context(
 
 
 def _chart_compression_ratio(
-    plt, data: dict, output_dir: Path, fmt: str,
+    plt,
+    data: dict,
+    output_dir: Path,
+    fmt: str,
 ) -> str:
     """Chart 4: FP16 vs compressed size at various context lengths."""
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -262,21 +339,38 @@ def _chart_compression_ratio(
     width = 0.25
 
     for i, key in enumerate(["fp16", "tq4", "tq3"]):
-        ax.bar([p + i * width for p in x_pos], data["memory_data"][key],
-               width, label=LABELS[key], color=COLORS[key], alpha=0.85)
+        ax.bar(
+            [p + i * width for p in x_pos],
+            data["memory_data"][key],
+            width,
+            label=LABELS[key],
+            color=COLORS[key],
+            alpha=0.85,
+        )
 
     # Add compression ratio annotations on TQ4 bars
     for j, ctx_label in enumerate(ctx_labels):
         ratio = data["ratio_data"]["tq4"][j]
         tq4_val = data["memory_data"]["tq4"][j]
-        ax.text(j + width, tq4_val + max(data["memory_data"]["fp16"]) * 0.02,
-                f"{ratio:.1f}x", ha="center", fontsize=9, fontweight="bold",
-                color=COLORS["tq4"])
+        ax.text(
+            j + width,
+            tq4_val + max(data["memory_data"]["fp16"]) * 0.02,
+            f"{ratio:.1f}x",
+            ha="center",
+            fontsize=9,
+            fontweight="bold",
+            color=COLORS["tq4"],
+        )
 
     ax.set_xticks([p + width for p in x_pos])
     ax.set_xticklabels(ctx_labels)
-    _apply_style(plt, ax, "KV Cache Size per Head (FP16 vs TurboQuant)",
-                 "Context Length", "Memory per Session (MB)")
+    _apply_style(
+        plt,
+        ax,
+        "KV Cache Size per Head (FP16 vs TurboQuant)",
+        "Context Length",
+        "Memory per Session (MB)",
+    )
 
     path = str(output_dir / f"compression_ratio.{fmt}")
     fig.tight_layout()
@@ -286,7 +380,10 @@ def _chart_compression_ratio(
 
 
 def _chart_quality_metrics(
-    plt, data: dict, output_dir: Path, fmt: str,
+    plt,
+    data: dict,
+    output_dir: Path,
+    fmt: str,
 ) -> str:
     """Chart 5: Compression quality — cosine similarity metrics."""
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -298,23 +395,46 @@ def _chart_quality_metrics(
     width = 0.3
 
     # FP16 baseline (always 1.0)
-    ax.bar([p - width for p in x_pos], [1.0] * 3, width,
-           label=LABELS["fp16"], color=COLORS["fp16"], alpha=0.85)
+    ax.bar(
+        [p - width for p in x_pos],
+        [1.0] * 3,
+        width,
+        label=LABELS["fp16"],
+        color=COLORS["fp16"],
+        alpha=0.85,
+    )
 
     for i, key in enumerate(["tq4", "tq3"]):
         vals = [data["quality_data"][key][mk] for mk in metric_keys]
-        ax.bar([p + i * width for p in x_pos], vals, width,
-               label=LABELS[key], color=COLORS[key], alpha=0.85)
+        ax.bar(
+            [p + i * width for p in x_pos],
+            vals,
+            width,
+            label=LABELS[key],
+            color=COLORS[key],
+            alpha=0.85,
+        )
         for j, v in enumerate(vals):
-            ax.text(j + i * width, v + 0.002, f"{v:.3f}",
-                    ha="center", fontsize=9, fontweight="bold")
+            ax.text(
+                j + i * width,
+                v + 0.002,
+                f"{v:.3f}",
+                ha="center",
+                fontsize=9,
+                fontweight="bold",
+            )
 
     ax.set_ylim(0.92, 1.01)
     ax.set_xticks(list(x_pos))
     ax.set_xticklabels(metrics)
     ax.axhline(y=1.0, color="gray", linestyle=":", alpha=0.5)
-    _apply_style(plt, ax, "Compression Quality (Cosine Similarity to FP16 Baseline)",
-                 "", "Cosine Similarity")
+    _apply_style(
+        plt,
+        ax,
+        "Compression Quality (Cosine Similarity to FP16 Baseline)",
+        "",
+        "Cosine Similarity",
+    )
 
     path = str(output_dir / f"quality_metrics.{fmt}")
     fig.tight_layout()
@@ -324,7 +444,10 @@ def _chart_quality_metrics(
 
 
 def _chart_concurrent_scaling(
-    plt, data: dict, output_dir: Path, fmt: str,
+    plt,
+    data: dict,
+    output_dir: Path,
+    fmt: str,
 ) -> str:
     """Chart 6: p95 TTFB degradation as concurrent sessions increase."""
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -332,26 +455,47 @@ def _chart_concurrent_scaling(
     sessions = data["concurrent_sessions"]
 
     for key in ["fp16", "tq4"]:
-        ax.plot(sessions, data["concurrent_ttfb"][key], "o-",
-                label=LABELS[key], color=COLORS[key], linewidth=2, markersize=6)
+        ax.plot(
+            sessions,
+            data["concurrent_ttfb"][key],
+            "o-",
+            label=LABELS[key],
+            color=COLORS[key],
+            linewidth=2,
+            markersize=6,
+        )
 
     ax.axhline(y=500, color="#e74c3c", linestyle="--", alpha=0.5, linewidth=1)
-    ax.text(sessions[-1], 510, "500ms voice threshold", color="#e74c3c",
-            fontsize=9, ha="right")
+    ax.text(
+        sessions[-1],
+        510,
+        "500ms voice threshold",
+        color="#e74c3c",
+        fontsize=9,
+        ha="right",
+    )
 
     # Find breaking points
     for key in ["fp16", "tq4"]:
         for i, ttfb in enumerate(data["concurrent_ttfb"][key]):
             if ttfb >= 500:
-                ax.annotate(f"{sessions[i]} sessions",
-                            xy=(sessions[i], ttfb),
-                            xytext=(sessions[i] + 3, ttfb + 30),
-                            fontsize=9, color=COLORS[key],
-                            arrowprops=dict(arrowstyle="->", color=COLORS[key]))
+                ax.annotate(
+                    f"{sessions[i]} sessions",
+                    xy=(sessions[i], ttfb),
+                    xytext=(sessions[i] + 3, ttfb + 30),
+                    fontsize=9,
+                    color=COLORS[key],
+                    arrowprops=dict(arrowstyle="->", color=COLORS[key]),
+                )
                 break
 
-    _apply_style(plt, ax, "p95 TTFB Degradation Under Concurrent Load",
-                 "Concurrent Sessions", "p95 TTFB (ms)")
+    _apply_style(
+        plt,
+        ax,
+        "p95 TTFB Degradation Under Concurrent Load",
+        "Concurrent Sessions",
+        "p95 TTFB (ms)",
+    )
 
     path = str(output_dir / f"concurrent_scaling.{fmt}")
     fig.tight_layout()
@@ -404,7 +548,9 @@ def generate_analytical_charts(
         console.print(f"  [green]HTML report: {html_path}[/green]")
         paths.append(html_path)
 
-    console.print(f"\n[bold green]Generated {len(paths)} files in {output_dir}/[/bold green]")
+    console.print(
+        f"\n[bold green]Generated {len(paths)} files in {output_dir}/[/bold green]"
+    )
     return paths
 
 
@@ -442,9 +588,9 @@ def _generate_html_report(
         name = Path(path).stem.replace("_", " ").title()
         images_html.append(
             f'<div class="chart">'
-            f'<h2>{name}</h2>'
+            f"<h2>{name}</h2>"
             f'<img src="data:image/png;base64,{b64}" alt="{name}">'
-            f'</div>'
+            f"</div>"
         )
 
     # Summary stats
@@ -490,7 +636,7 @@ def _generate_html_report(
 {gpu_rows}
 </table>
 
-{''.join(images_html)}
+{"".join(images_html)}
 
 <footer style="margin-top:3rem; color:#95a5a6; font-size:0.85rem; text-align:center;">
 Generated by VoiceQuant v0.1.0 | Analytical estimates for 7B AWQ model at 4K context

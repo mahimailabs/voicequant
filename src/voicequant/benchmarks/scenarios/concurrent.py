@@ -16,16 +16,16 @@ GPU capacity model from ``voicequant.server.config.GPU_CAPACITY_ESTIMATES``.
 
 from __future__ import annotations
 
-import asyncio
 import time
 from typing import Any
 
 from rich.console import Console
 
-from voicequant.server.config import ServerConfig, GPU_CAPACITY_ESTIMATES
+from voicequant.server.config import GPU_CAPACITY_ESTIMATES, ServerConfig
 
 try:
     import openai
+
     _HAS_OPENAI = True
 except ImportError:
     _HAS_OPENAI = False
@@ -59,6 +59,7 @@ def _detect_gpu() -> str:
     """Detect GPU type, defaulting to A100 for simulation."""
     try:
         import torch
+
         if torch.cuda.is_available():
             name = torch.cuda.get_device_name(0).upper()
             for gpu in GPU_CAPACITY_ESTIMATES:
@@ -115,7 +116,10 @@ class ConcurrentBenchmark:
     ) -> dict[str, Any]:
         """Run a 5-turn session against a live server."""
         messages = [
-            {"role": "system", "content": "You are a helpful voice assistant. Keep responses brief."},
+            {
+                "role": "system",
+                "content": "You are a helpful voice assistant. Keep responses brief.",
+            },
         ]
         ttfbs: list[float] = []
         total_tokens = 0
@@ -246,9 +250,13 @@ class ConcurrentBenchmark:
         is_simulated = client is None
 
         if is_simulated:
-            console.print("[yellow]No live server detected -- using simulated results.[/yellow]")
+            console.print(
+                "[yellow]No live server detected -- using simulated results.[/yellow]"
+            )
         else:
-            console.print(f"[green]Connected to live server at {config.host}:{config.port}[/green]")
+            console.print(
+                f"[green]Connected to live server at {config.host}:{config.port}[/green]"
+            )
 
         levels = [n for n in _CONCURRENCY_LEVELS if n <= max_sessions]
         kv_dtypes = ["fp16", "tq4"]
@@ -267,6 +275,7 @@ class ConcurrentBenchmark:
                 else:
                     # For live testing, run sessions concurrently using threads
                     import concurrent.futures
+
                     session_results: list[dict[str, Any]] = []
                     with concurrent.futures.ThreadPoolExecutor(max_workers=n) as pool:
                         futures = [
@@ -283,16 +292,24 @@ class ConcurrentBenchmark:
                         "n_sessions": n,
                         "kv_dtype": kv_dtype,
                         "gpu": gpu,
-                        "ttfb_p50_ms": round(_percentile(
-                            [s["ttfb_p50_ms"] for s in session_results], 50
-                        ), 2),
+                        "ttfb_p50_ms": round(
+                            _percentile(
+                                [s["ttfb_p50_ms"] for s in session_results], 50
+                            ),
+                            2,
+                        ),
                         "ttfb_p95_ms": round(_percentile(all_ttfb_p95, 95), 2),
-                        "ttfb_p99_ms": round(_percentile(
-                            [s["ttfb_p99_ms"] for s in session_results], 99
-                        ), 2),
+                        "ttfb_p99_ms": round(
+                            _percentile(
+                                [s["ttfb_p99_ms"] for s in session_results], 99
+                            ),
+                            2,
+                        ),
                         "tokens_per_sec_per_session": round(
                             sum(all_tps) / len(all_tps), 2
-                        ) if all_tps else 0,
+                        )
+                        if all_tps
+                        else 0,
                         "total_gpu_memory_gb": 0,  # would need nvidia-smi
                         "kv_memory_gb": 0,
                         "load_factor": 0,

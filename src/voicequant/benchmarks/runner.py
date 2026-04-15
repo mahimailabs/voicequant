@@ -42,17 +42,30 @@ def _load_scenarios() -> None:
         return
 
     scenario_imports = {
-        "multi_turn": ("voicequant.benchmarks.scenarios.multi_turn", "MultiTurnBenchmark"),
-        "concurrent": ("voicequant.benchmarks.scenarios.concurrent", "ConcurrentBenchmark"),
+        "multi_turn": (
+            "voicequant.benchmarks.scenarios.multi_turn",
+            "MultiTurnBenchmark",
+        ),
+        "concurrent": (
+            "voicequant.benchmarks.scenarios.concurrent",
+            "ConcurrentBenchmark",
+        ),
         "ttfb": ("voicequant.benchmarks.scenarios.ttfb", "TTFBBenchmark"),
-        "system_prompt": ("voicequant.benchmarks.scenarios.system_prompt", "SystemPromptBenchmark"),
-        "tool_calling": ("voicequant.benchmarks.scenarios.tool_calling", "ToolCallingBenchmark"),
+        "system_prompt": (
+            "voicequant.benchmarks.scenarios.system_prompt",
+            "SystemPromptBenchmark",
+        ),
+        "tool_calling": (
+            "voicequant.benchmarks.scenarios.tool_calling",
+            "ToolCallingBenchmark",
+        ),
         "quality": ("voicequant.benchmarks.scenarios.quality", "QualityBenchmark"),
     }
 
     for name, (module_path, class_name) in scenario_imports.items():
         try:
             import importlib
+
             mod = importlib.import_module(module_path)
             _SCENARIO_CLASSES[name] = getattr(mod, class_name)
         except Exception as e:
@@ -83,7 +96,11 @@ def _print_summary_table(all_results: dict[str, dict[str, Any]]) -> None:
             )
             continue
 
-        simulated = "[yellow]Yes[/yellow]" if result.get("simulated", True) else "[green]No[/green]"
+        simulated = (
+            "[yellow]Yes[/yellow]"
+            if result.get("simulated", True)
+            else "[green]No[/green]"
+        )
         findings = _extract_key_findings(scenario_name, result)
         table.add_row(scenario_name, "[green]OK[/green]", simulated, findings)
 
@@ -113,7 +130,9 @@ def _extract_key_findings(scenario_name: str, result: dict[str, Any]) -> str:
         summary = result.get("summary", {})
         parts = []
         for ctx_len, stats in summary.items():
-            parts.append(f"{ctx_len}: {stats.get('best_dtype', '?')} {stats.get('best_ttfb_ms', 0):.1f}ms")
+            parts.append(
+                f"{ctx_len}: {stats.get('best_dtype', '?')} {stats.get('best_ttfb_ms', 0):.1f}ms"
+            )
         return " | ".join(parts[:3]) if parts else "No summary"
 
     elif scenario_name == "system_prompt":
@@ -159,12 +178,16 @@ def _print_detailed_results(scenario_name: str, result: dict[str, Any]) -> None:
 
         ctx_lengths = sorted(set(r["context_length"] for r in results))
         for ctx in ctx_lengths:
-            ctx_results = {r["kv_dtype"]: r for r in results if r["context_length"] == ctx}
+            ctx_results = {
+                r["kv_dtype"]: r for r in results if r["context_length"] == ctx
+            }
             fp16 = ctx_results.get("fp16", {}).get("ttfb_ms", 0)
             tq4 = ctx_results.get("tq4", {}).get("ttfb_ms", 0)
             tq3 = ctx_results.get("tq3", {}).get("ttfb_ms", 0)
             speedup = f"{fp16 / tq4:.2f}x" if tq4 > 0 else "-"
-            table.add_row(f"{ctx:,}", f"{fp16:.1f}", f"{tq4:.1f}", f"{tq3:.1f}", speedup)
+            table.add_row(
+                f"{ctx:,}", f"{fp16:.1f}", f"{tq4:.1f}", f"{tq3:.1f}", speedup
+            )
 
         console.print(table)
 
@@ -202,7 +225,7 @@ def _print_detailed_results(scenario_name: str, result: dict[str, Any]) -> None:
 
         metrics = ["avg_rouge_l", "avg_cosine_similarity", "exact_match_rate"]
         labels = ["ROUGE-L", "Cosine Similarity", "Exact Match Rate"]
-        for label, metric in zip(labels, metrics):
+        for label, metric in zip(labels, metrics, strict=False):
             tq4_val = summary.get("tq4", {}).get(metric, 0)
             tq3_val = summary.get("tq3", {}).get(metric, 0)
             table.add_row(label, f"{tq4_val:.4f}", f"{tq3_val:.4f}")
@@ -239,7 +262,7 @@ def run_benchmarks(
     if model:
         config = config.model_copy(update={"model": model})
 
-    console.print(f"\n[bold underline]VoiceQuant Benchmark Suite[/bold underline]")
+    console.print("\n[bold underline]VoiceQuant Benchmark Suite[/bold underline]")
     console.print(f"Model: {config.model}")
     console.print(f"Scenarios: {', '.join(scenarios)}")
     console.print(f"Max sessions: {max_sessions}\n")
@@ -266,7 +289,9 @@ def run_benchmarks(
         t0 = time.perf_counter()
         try:
             if scenario_name == "concurrent":
-                result = instance.run(model=model, config=config, max_sessions=max_sessions)
+                result = instance.run(
+                    model=model, config=config, max_sessions=max_sessions
+                )
             else:
                 result = instance.run(model=model, config=config)
 
@@ -282,7 +307,10 @@ def run_benchmarks(
         except Exception as e:
             elapsed = time.perf_counter() - t0
             console.print(f"[red]Error in {scenario_name}: {e}[/red]")
-            all_results[scenario_name] = {"error": str(e), "elapsed_s": round(elapsed, 2)}
+            all_results[scenario_name] = {
+                "error": str(e),
+                "elapsed_s": round(elapsed, 2),
+            }
 
     # Summary table
     console.print()
@@ -292,6 +320,7 @@ def run_benchmarks(
     if report_path:
         try:
             from voicequant.benchmarks.report import generate_report
+
             generate_report(all_results, report_path)
             console.print(f"\n[green]Report written to {report_path}[/green]")
         except Exception as e:

@@ -37,7 +37,9 @@ class TurboQuantConfig(BaseModel):
         description="GPU memory utilization (0.0-1.0), leave headroom for bursts",
     )
     max_num_seqs: int = Field(default=64, description="Maximum concurrent sequences")
-    max_num_batched_tokens: int = Field(default=8192, description="Max tokens per batch")
+    max_num_batched_tokens: int = Field(
+        default=8192, description="Max tokens per batch"
+    )
 
     # Response defaults (overridable per-request)
     default_max_tokens: int = Field(

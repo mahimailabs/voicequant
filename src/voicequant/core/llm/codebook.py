@@ -3,13 +3,15 @@
 # against that gaussian. runs once on cpu at init.
 
 import math
+
 import torch
 from scipy import integrate
 
 
 def _gaussian_pdf(x, sigma):
     return (1.0 / (math.sqrt(2 * math.pi) * sigma)) * math.exp(
-        -x * x / (2 * sigma * sigma))
+        -x * x / (2 * sigma * sigma)
+    )
 
 
 def solve_lloyd_max(d, bits, max_iter=200, tol=1e-10):
@@ -22,7 +24,8 @@ def solve_lloyd_max(d, bits, max_iter=200, tol=1e-10):
 
     for _ in range(max_iter):
         boundaries = [
-            (centroids[i] + centroids[i + 1]) / 2.0 for i in range(n_levels - 1)]
+            (centroids[i] + centroids[i + 1]) / 2.0 for i in range(n_levels - 1)
+        ]
         edges = [lo * 3] + boundaries + [hi * 3]
         new_centroids = []
         for i in range(n_levels):
@@ -34,15 +37,14 @@ def solve_lloyd_max(d, bits, max_iter=200, tol=1e-10):
             break
         centroids = new_centroids
 
-    boundaries = [
-        (centroids[i] + centroids[i + 1]) / 2.0 for i in range(n_levels - 1)]
+    boundaries = [(centroids[i] + centroids[i + 1]) / 2.0 for i in range(n_levels - 1)]
     return (
         torch.tensor(centroids, dtype=torch.float32),
-        torch.tensor(boundaries, dtype=torch.float32))
+        torch.tensor(boundaries, dtype=torch.float32),
+    )
 
 
 class LloydMaxCodebook:
-
     def __init__(self, d, bits):
         self.d = d
         self.bits = bits

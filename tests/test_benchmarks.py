@@ -3,8 +3,9 @@
 import json
 from pathlib import Path
 
-
-PROMPTS_DIR = Path(__file__).parent.parent / "src" / "voicequant" / "benchmarks" / "prompts"
+PROMPTS_DIR = (
+    Path(__file__).parent.parent / "src" / "voicequant" / "benchmarks" / "prompts"
+)
 
 
 class TestBenchmarkPrompts:
@@ -45,39 +46,45 @@ class TestBenchmarkPrompts:
         short = json.loads((conv_dir / "short_5_turn.json").read_text())
         medium = json.loads((conv_dir / "medium_10_turn.json").read_text())
         long_ = json.loads((conv_dir / "long_20_turn.json").read_text())
-        assert len(short["turns"]) >= 10    # 5 turns = 10 messages
-        assert len(medium["turns"]) >= 20   # 10 turns = 20 messages
-        assert len(long_["turns"]) >= 40    # 20 turns = 40 messages
+        assert len(short["turns"]) >= 10  # 5 turns = 10 messages
+        assert len(medium["turns"]) >= 20  # 10 turns = 20 messages
+        assert len(long_["turns"]) >= 40  # 20 turns = 40 messages
 
 
 class TestBenchmarkScenarios:
     def test_multi_turn_importable(self):
         from voicequant.benchmarks.scenarios.multi_turn import MultiTurnBenchmark
+
         bench = MultiTurnBenchmark()
         assert bench.name == "multi_turn"
 
     def test_concurrent_importable(self):
         from voicequant.benchmarks.scenarios.concurrent import ConcurrentBenchmark
+
         bench = ConcurrentBenchmark()
         assert bench.name == "concurrent"
 
     def test_ttfb_importable(self):
         from voicequant.benchmarks.scenarios.ttfb import TTFBBenchmark
+
         bench = TTFBBenchmark()
         assert bench.name == "ttfb"
 
     def test_system_prompt_importable(self):
         from voicequant.benchmarks.scenarios.system_prompt import SystemPromptBenchmark
+
         bench = SystemPromptBenchmark()
         assert bench.name == "system_prompt"
 
     def test_tool_calling_importable(self):
         from voicequant.benchmarks.scenarios.tool_calling import ToolCallingBenchmark
+
         bench = ToolCallingBenchmark()
         assert bench.name == "tool_calling"
 
     def test_quality_importable(self):
         from voicequant.benchmarks.scenarios.quality import QualityBenchmark
+
         bench = QualityBenchmark()
         assert bench.name == "quality"
 
@@ -85,10 +92,12 @@ class TestBenchmarkScenarios:
 class TestBenchmarkRunner:
     def test_runner_importable(self):
         from voicequant.benchmarks.runner import run_benchmarks
+
         assert callable(run_benchmarks)
 
 
 class TestBenchmarkReport:
     def test_report_importable(self):
         from voicequant.benchmarks.report import generate_report
+
         assert callable(generate_report)

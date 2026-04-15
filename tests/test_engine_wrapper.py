@@ -1,6 +1,10 @@
 """Tests for the server engine and config modules."""
 
-from voicequant.server.config import ServerConfig, VOICE_DEFAULTS, GPU_CAPACITY_ESTIMATES
+from voicequant.server.config import (
+    GPU_CAPACITY_ESTIMATES,
+    VOICE_DEFAULTS,
+    ServerConfig,
+)
 
 
 class TestServerConfig:
@@ -37,6 +41,7 @@ class TestServerConfig:
 class TestServerApp:
     def test_create_app(self):
         from voicequant.server.app import create_app
+
         config = ServerConfig()
         app = create_app(config)
         assert app is not None
@@ -44,6 +49,7 @@ class TestServerApp:
 
     def test_app_has_routes(self):
         from voicequant.server.app import create_app
+
         config = ServerConfig()
         app = create_app(config)
         routes = [r.path for r in app.routes]

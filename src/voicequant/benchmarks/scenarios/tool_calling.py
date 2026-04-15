@@ -18,7 +18,6 @@ scores based on published TurboQuant quality metrics.
 from __future__ import annotations
 
 import json
-import time
 from typing import Any
 
 from rich.console import Console
@@ -27,6 +26,7 @@ from voicequant.server.config import ServerConfig
 
 try:
     import openai
+
     _HAS_OPENAI = True
 except ImportError:
     _HAS_OPENAI = False
@@ -46,8 +46,14 @@ TOOL_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "location": {"type": "string", "description": "City or location name"},
-                    "date": {"type": "string", "description": "Date in YYYY-MM-DD format"},
+                    "location": {
+                        "type": "string",
+                        "description": "City or location name",
+                    },
+                    "date": {
+                        "type": "string",
+                        "description": "Date in YYYY-MM-DD format",
+                    },
                 },
                 "required": ["location", "date"],
             },
@@ -76,7 +82,10 @@ TOOL_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "expression": {"type": "string", "description": "Math expression to evaluate"},
+                    "expression": {
+                        "type": "string",
+                        "description": "Math expression to evaluate",
+                    },
                 },
                 "required": ["expression"],
             },
@@ -148,31 +157,46 @@ def _make_conversation(conv_id: int) -> dict[str, Any]:
     conversations = [
         {
             "messages": [
-                {"role": "user", "content": "What's the weather in Tokyo tomorrow? Also convert 100 USD to yen and set a reminder for my flight at 8 AM."},
+                {
+                    "role": "user",
+                    "content": "What's the weather in Tokyo tomorrow? Also convert 100 USD to yen and set a reminder for my flight at 8 AM.",
+                },
             ],
             "expected_tools": ["get_weather", "convert_units", "set_reminder"],
         },
         {
             "messages": [
-                {"role": "user", "content": "Calculate 15% tip on $82.50, then tell me what time it is in London and set a reminder to pay at 6 PM."},
+                {
+                    "role": "user",
+                    "content": "Calculate 15% tip on $82.50, then tell me what time it is in London and set a reminder to pay at 6 PM.",
+                },
             ],
             "expected_tools": ["calculate", "get_time", "set_reminder"],
         },
         {
             "messages": [
-                {"role": "user", "content": "Search for the population of Brazil, convert 500 km to miles, and what's the weather in Sao Paulo?"},
+                {
+                    "role": "user",
+                    "content": "Search for the population of Brazil, convert 500 km to miles, and what's the weather in Sao Paulo?",
+                },
             ],
             "expected_tools": ["search_knowledge", "convert_units", "get_weather"],
         },
         {
             "messages": [
-                {"role": "user", "content": "What time is it in Sydney? Also check the weather there and remind me to call at 9 AM."},
+                {
+                    "role": "user",
+                    "content": "What time is it in Sydney? Also check the weather there and remind me to call at 9 AM.",
+                },
             ],
             "expected_tools": ["get_time", "get_weather", "set_reminder"],
         },
         {
             "messages": [
-                {"role": "user", "content": "Calculate the square root of 2025, convert 72 degrees Fahrenheit to Celsius, and search for who invented the telephone."},
+                {
+                    "role": "user",
+                    "content": "Calculate the square root of 2025, convert 72 degrees Fahrenheit to Celsius, and search for who invented the telephone.",
+                },
             ],
             "expected_tools": ["calculate", "convert_units", "search_knowledge"],
         },
@@ -190,7 +214,12 @@ def _score_tool_calls(
         Dict with name_accuracy, sequence_accuracy, recall, precision.
     """
     if not expected:
-        return {"name_accuracy": 1.0, "sequence_accuracy": 1.0, "recall": 1.0, "precision": 1.0}
+        return {
+            "name_accuracy": 1.0,
+            "sequence_accuracy": 1.0,
+            "recall": 1.0,
+            "precision": 1.0,
+        }
 
     expected_set = set(expected)
     actual_set = set(actual)
@@ -286,11 +315,15 @@ class ToolCallingBenchmark:
                 for tc in choice.message.tool_calls:
                     tool_names.append(tc.function.name)
                     # Simulate tool response
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tc.id,
-                        "content": json.dumps({"status": "success", "data": "simulated"}),
-                    })
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tc.id,
+                            "content": json.dumps(
+                                {"status": "success", "data": "simulated"}
+                            ),
+                        }
+                    )
             else:
                 # Model finished without more tool calls
                 break
@@ -308,6 +341,7 @@ class ToolCallingBenchmark:
         TQ4 has a very small degradation (based on published quality metrics).
         """
         import random
+
         expected = list(conv["expected_tools"])
 
         if kv_dtype == "fp16":
@@ -344,7 +378,9 @@ class ToolCallingBenchmark:
         is_simulated = client is None
 
         if is_simulated:
-            console.print("[yellow]No live server detected -- using simulated results.[/yellow]")
+            console.print(
+                "[yellow]No live server detected -- using simulated results.[/yellow]"
+            )
 
         kv_dtypes = ["fp16", "tq4"]
         n_conversations = 20
@@ -376,9 +412,13 @@ class ToolCallingBenchmark:
 
             # Aggregate
             avg_recall = sum(s["recall"] for s in dtype_scores) / len(dtype_scores)
-            avg_precision = sum(s["precision"] for s in dtype_scores) / len(dtype_scores)
+            avg_precision = sum(s["precision"] for s in dtype_scores) / len(
+                dtype_scores
+            )
             avg_name = sum(s["name_accuracy"] for s in dtype_scores) / len(dtype_scores)
-            avg_seq = sum(s["sequence_accuracy"] for s in dtype_scores) / len(dtype_scores)
+            avg_seq = sum(s["sequence_accuracy"] for s in dtype_scores) / len(
+                dtype_scores
+            )
 
             console.print(
                 f"  Recall: {avg_recall:.1%} | Precision: {avg_precision:.1%} | "
@@ -391,10 +431,13 @@ class ToolCallingBenchmark:
             dtype_results = [r for r in all_results if r["kv_dtype"] == kv_dtype]
             summary[kv_dtype] = {
                 "avg_name_accuracy": round(
-                    sum(r["name_accuracy"] for r in dtype_results) / len(dtype_results), 4
+                    sum(r["name_accuracy"] for r in dtype_results) / len(dtype_results),
+                    4,
                 ),
                 "avg_sequence_accuracy": round(
-                    sum(r["sequence_accuracy"] for r in dtype_results) / len(dtype_results), 4
+                    sum(r["sequence_accuracy"] for r in dtype_results)
+                    / len(dtype_results),
+                    4,
                 ),
                 "avg_recall": round(
                     sum(r["recall"] for r in dtype_results) / len(dtype_results), 4

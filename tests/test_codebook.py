@@ -10,10 +10,11 @@ Verifies:
 """
 
 import math
-import torch
-import pytest
 
-from voicequant.core.codebook import LloydMaxCodebook, solve_lloyd_max
+import pytest
+import torch
+
+from voicequant.core.codebook import LloydMaxCodebook
 
 
 @pytest.mark.parametrize("d", [64, 128, 256])

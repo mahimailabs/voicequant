@@ -9,8 +9,8 @@ reference path for:
   - Various sequence lengths and bit widths
 """
 
-import torch
 import pytest
+import torch
 
 from voicequant import TurboQuantEngine
 

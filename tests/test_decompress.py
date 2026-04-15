@@ -1,8 +1,9 @@
 """Test value decompression round-trip against PyTorch reference."""
 
 import math
-import torch
+
 import pytest
+import torch
 
 from voicequant import TurboQuantEngine
 
@@ -27,9 +28,7 @@ def test_reconstruction_quality(total_bits):
     compressed = engine.compress_values_pytorch(V)
     V_recon = engine.decompress_values_pytorch(compressed)
 
-    cos_sim = torch.nn.functional.cosine_similarity(
-        V.float(), V_recon.float(), dim=-1
-    )
+    cos_sim = torch.nn.functional.cosine_similarity(V.float(), V_recon.float(), dim=-1)
 
     min_sim = {2: 0.80, 3: 0.90, 4: 0.96}[total_bits]
     assert cos_sim.mean().item() > min_sim, (

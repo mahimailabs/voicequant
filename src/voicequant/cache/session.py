@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import torch
 from typing import Any
+
+import torch
 
 from ..core.engine import TurboQuantEngine
 
@@ -39,9 +40,7 @@ class CacheSession:
     def truncate(self, seq_len: int) -> None:
         """Truncate compressed cache to first seq_len positions."""
         if self._compressed is not None:
-            self._compressed = self._engine.truncate_cache(
-                self._compressed, seq_len
-            )
+            self._compressed = self._engine.truncate_cache(self._compressed, seq_len)
         self._seq_len = min(seq_len, self._seq_len)
 
     def build(self):

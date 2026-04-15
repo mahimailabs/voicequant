@@ -1,7 +1,7 @@
 """Tests for TurboQuantWrapper — voice-optimized compression wrapper."""
 
-import torch
 import pytest
+import torch
 
 from voicequant.core.config import TurboQuantConfig
 from voicequant.core.wrapper import TurboQuantWrapper
@@ -98,13 +98,21 @@ class TestTurboQuantWrapper:
         compressed = {
             "layers": [
                 (
-                    [{"indices": torch.zeros(100, 128, dtype=torch.uint8),
-                      "k_mse": torch.zeros(100, 128),
-                      "qjl_signs": torch.zeros(100, 128, dtype=torch.int8),
-                      "vec_norms": torch.zeros(100),
-                      "residual_norms": torch.zeros(100)}],
-                    [{"indices": torch.zeros(100, 128, dtype=torch.uint8),
-                      "vec_norms": torch.zeros(100)}],
+                    [
+                        {
+                            "indices": torch.zeros(100, 128, dtype=torch.uint8),
+                            "k_mse": torch.zeros(100, 128),
+                            "qjl_signs": torch.zeros(100, 128, dtype=torch.int8),
+                            "vec_norms": torch.zeros(100),
+                            "residual_norms": torch.zeros(100),
+                        }
+                    ],
+                    [
+                        {
+                            "indices": torch.zeros(100, 128, dtype=torch.uint8),
+                            "vec_norms": torch.zeros(100),
+                        }
+                    ],
                 )
             ]
         }

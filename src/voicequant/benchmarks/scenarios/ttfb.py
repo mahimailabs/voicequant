@@ -25,6 +25,7 @@ from voicequant.server.config import ServerConfig
 
 try:
     import openai
+
     _HAS_OPENAI = True
 except ImportError:
     _HAS_OPENAI = False
@@ -218,9 +219,13 @@ class TTFBBenchmark:
         is_simulated = client is None
 
         if is_simulated:
-            console.print("[yellow]No live server detected -- using simulated results.[/yellow]")
+            console.print(
+                "[yellow]No live server detected -- using simulated results.[/yellow]"
+            )
         else:
-            console.print(f"[green]Connected to live server at {config.host}:{config.port}[/green]")
+            console.print(
+                f"[green]Connected to live server at {config.host}:{config.port}[/green]"
+            )
 
         all_results: list[dict[str, Any]] = []
 
@@ -273,7 +278,8 @@ class TTFBBenchmark:
                 "best_ttfb_ms": best["ttfb_ms"],
                 "fp16_ttfb_ms": fp16_result["ttfb_ms"],
                 "speedup": round(fp16_result["ttfb_ms"] / best["ttfb_ms"], 2)
-                    if best["ttfb_ms"] > 0 else 0,
+                if best["ttfb_ms"] > 0
+                else 0,
             }
 
         return {

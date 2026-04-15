@@ -1,8 +1,9 @@
 """Full pipeline: compress, attend, decompress — compare against FP16 reference."""
 
 import math
-import torch
+
 import pytest
+import torch
 
 from voicequant import TurboQuantEngine
 
@@ -164,6 +165,7 @@ def test_different_head_dims(head_dim):
 
 
 # V-fused kernel tests (on-chip V decompression path)
+
 
 @pytest.mark.parametrize("total_bits", [2, 3])
 @pytest.mark.parametrize("seq_q,seq_k", [(1, 128), (1, 512), (4, 256)])

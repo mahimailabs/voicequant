@@ -8,9 +8,8 @@ Key properties verified:
   - Sweep over multiple bit widths and sequence lengths
 """
 
-import math
-import torch
 import pytest
+import torch
 
 from voicequant import TurboQuantEngine
 
@@ -73,9 +72,7 @@ def test_correlation_with_true_scores(total_bits):
     )[0, 1].item()
 
     min_corr = {2: 0.45, 3: 0.75, 4: 0.90}[total_bits]
-    assert corr > min_corr, (
-        f"bits={total_bits}: correlation={corr:.4f} < {min_corr}"
-    )
+    assert corr > min_corr, f"bits={total_bits}: correlation={corr:.4f} < {min_corr}"
 
 
 def test_scaling_correct():

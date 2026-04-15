@@ -18,7 +18,6 @@ based on analytical compression error models.
 from __future__ import annotations
 
 import math
-import time
 from collections import Counter
 from typing import Any
 
@@ -28,12 +27,14 @@ from voicequant.server.config import ServerConfig
 
 try:
     import openai
+
     _HAS_OPENAI = True
 except ImportError:
     _HAS_OPENAI = False
 
 try:
     import torch
+
     _HAS_TORCH = True
 except ImportError:
     _HAS_TORCH = False
@@ -222,12 +223,14 @@ def _simulated_layer_cosine_similarity(
         else:
             base_sim = 1.0
 
-        results.append({
-            "layer": layer_idx,
-            "kv_dtype": kv_dtype,
-            "key_cosine_sim": round(min(1.0, base_sim + 0.001), 6),
-            "value_cosine_sim": round(min(1.0, base_sim), 6),
-        })
+        results.append(
+            {
+                "layer": layer_idx,
+                "kv_dtype": kv_dtype,
+                "key_cosine_sim": round(min(1.0, base_sim + 0.001), 6),
+                "value_cosine_sim": round(min(1.0, base_sim), 6),
+            }
+        )
     return results
 
 
@@ -267,7 +270,10 @@ class QualityBenchmark:
         response = client.chat.completions.create(
             model=config.model,
             messages=[
-                {"role": "system", "content": "You are a helpful voice assistant. Keep responses under 3 sentences."},
+                {
+                    "role": "system",
+                    "content": "You are a helpful voice assistant. Keep responses under 3 sentences.",
+                },
                 {"role": "user", "content": prompt},
             ],
             max_tokens=config.default_max_tokens,
@@ -302,7 +308,9 @@ class QualityBenchmark:
         is_simulated = client is None
 
         if is_simulated:
-            console.print("[yellow]No live server detected -- using simulated results.[/yellow]")
+            console.print(
+                "[yellow]No live server detected -- using simulated results.[/yellow]"
+            )
 
         kv_dtypes = ["fp16", "tq4", "tq3"]
         n_prompts = len(VOICE_PROMPTS)
@@ -327,21 +335,26 @@ class QualityBenchmark:
 
                     rouge_l = _rouge_l(reference, compressed_resp)
                     cos_sim = _cosine_similarity_text(reference, compressed_resp)
-                    exact_match = 1.0 if reference.strip() == compressed_resp.strip() else 0.0
+                    exact_match = (
+                        1.0 if reference.strip() == compressed_resp.strip() else 0.0
+                    )
 
-                    prompt_results.append({
-                        "prompt_idx": i,
-                        "kv_dtype": kv_dtype,
-                        "rouge_l": round(rouge_l, 4),
-                        "cosine_similarity": round(cos_sim, 4),
-                        "exact_match": exact_match,
-                    })
+                    prompt_results.append(
+                        {
+                            "prompt_idx": i,
+                            "kv_dtype": kv_dtype,
+                            "rouge_l": round(rouge_l, 4),
+                            "cosine_similarity": round(cos_sim, 4),
+                            "exact_match": exact_match,
+                        }
+                    )
 
                     if (i + 1) % 20 == 0:
                         console.print(f"  {i + 1}/{n_prompts} comparisons completed")
         else:
             # Simulated quality scores
             import random
+
             random.seed(42)  # reproducible
 
             for kv_dtype in ["tq4", "tq3"]:
@@ -358,13 +371,15 @@ class QualityBenchmark:
                         cos_sim = random.gauss(0.93, 0.03)
                         exact_match = 1.0 if random.random() < 0.45 else 0.0
 
-                    prompt_results.append({
-                        "prompt_idx": i,
-                        "kv_dtype": kv_dtype,
-                        "rouge_l": round(max(0, min(1, rouge_l)), 4),
-                        "cosine_similarity": round(max(0, min(1, cos_sim)), 4),
-                        "exact_match": exact_match,
-                    })
+                    prompt_results.append(
+                        {
+                            "prompt_idx": i,
+                            "kv_dtype": kv_dtype,
+                            "rouge_l": round(max(0, min(1, rouge_l)), 4),
+                            "cosine_similarity": round(max(0, min(1, cos_sim)), 4),
+                            "exact_match": exact_match,
+                        }
+                    )
 
         # Build summary
         summary: dict[str, dict[str, float]] = {}

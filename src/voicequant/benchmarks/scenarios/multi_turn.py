@@ -17,15 +17,16 @@ results based on the analytical compression model from the VoiceQuant paper.
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from rich.console import Console
 
-from voicequant.server.config import ServerConfig, GPU_CAPACITY_ESTIMATES
+from voicequant.server.config import ServerConfig
 
 try:
     import openai  # used to talk to a live vLLM server
+
     _HAS_OPENAI = True
 except ImportError:
     _HAS_OPENAI = False
@@ -45,43 +46,100 @@ VOICE_AGENT_SYSTEM_PROMPT = (
 
 SCRIPTED_CONVERSATION: list[dict[str, str]] = [
     {"role": "user", "content": "Hey, what's the weather going to be like tomorrow?"},
-    {"role": "assistant", "content": "Tomorrow looks sunny with a high of 72 and a low of 55. Should be a nice day."},
-    {"role": "user", "content": "Great. Can you set a reminder for me to go for a run at 7 AM?"},
-    {"role": "assistant", "content": "Done, I've set a reminder for 7 AM tomorrow to go for a run."},
+    {
+        "role": "assistant",
+        "content": "Tomorrow looks sunny with a high of 72 and a low of 55. Should be a nice day.",
+    },
+    {
+        "role": "user",
+        "content": "Great. Can you set a reminder for me to go for a run at 7 AM?",
+    },
+    {
+        "role": "assistant",
+        "content": "Done, I've set a reminder for 7 AM tomorrow to go for a run.",
+    },
     {"role": "user", "content": "Thanks. What's 15% tip on a $68 bill?"},
-    {"role": "assistant", "content": "A 15% tip on $68 is $10.20, making the total $78.20."},
+    {
+        "role": "assistant",
+        "content": "A 15% tip on $68 is $10.20, making the total $78.20.",
+    },
     {"role": "user", "content": "And what about 20%?"},
-    {"role": "assistant", "content": "At 20%, the tip would be $13.60, for a total of $81.60."},
+    {
+        "role": "assistant",
+        "content": "At 20%, the tip would be $13.60, for a total of $81.60.",
+    },
     {"role": "user", "content": "OK. Can you tell me what the capital of Portugal is?"},
     {"role": "assistant", "content": "The capital of Portugal is Lisbon."},
     {"role": "user", "content": "How far is it from Lisbon to Madrid?"},
-    {"role": "assistant", "content": "Lisbon to Madrid is about 625 kilometers, or roughly 390 miles by road."},
+    {
+        "role": "assistant",
+        "content": "Lisbon to Madrid is about 625 kilometers, or roughly 390 miles by road.",
+    },
     {"role": "user", "content": "What time zone is Portugal in?"},
-    {"role": "assistant", "content": "Portugal is in the Western European Time zone, which is UTC+0 in winter and UTC+1 in summer."},
-    {"role": "user", "content": "Got it. Can you also remind me to call my mom at 6 PM today?"},
-    {"role": "assistant", "content": "Sure, I've set a reminder to call your mom at 6 PM today."},
+    {
+        "role": "assistant",
+        "content": "Portugal is in the Western European Time zone, which is UTC+0 in winter and UTC+1 in summer.",
+    },
+    {
+        "role": "user",
+        "content": "Got it. Can you also remind me to call my mom at 6 PM today?",
+    },
+    {
+        "role": "assistant",
+        "content": "Sure, I've set a reminder to call your mom at 6 PM today.",
+    },
     {"role": "user", "content": "How many reminders do I have set now?"},
-    {"role": "assistant", "content": "You have two reminders: the 7 AM run tomorrow and the 6 PM call today."},
+    {
+        "role": "assistant",
+        "content": "You have two reminders: the 7 AM run tomorrow and the 6 PM call today.",
+    },
     {"role": "user", "content": "Can you convert 100 euros to dollars?"},
-    {"role": "assistant", "content": "At current rates, 100 euros is approximately $108.50 USD."},
+    {
+        "role": "assistant",
+        "content": "At current rates, 100 euros is approximately $108.50 USD.",
+    },
     {"role": "user", "content": "What about to British pounds?"},
-    {"role": "assistant", "content": "100 euros converts to approximately 86 British pounds."},
+    {
+        "role": "assistant",
+        "content": "100 euros converts to approximately 86 British pounds.",
+    },
     {"role": "user", "content": "Thanks. What's a good recipe for a quick dinner?"},
-    {"role": "assistant", "content": "A quick stir-fry works well: sautee sliced chicken or tofu with vegetables in soy sauce and garlic. Serve over rice. Takes about 20 minutes."},
+    {
+        "role": "assistant",
+        "content": "A quick stir-fry works well: sautee sliced chicken or tofu with vegetables in soy sauce and garlic. Serve over rice. Takes about 20 minutes.",
+    },
     {"role": "user", "content": "How many calories would that be roughly?"},
-    {"role": "assistant", "content": "A chicken stir-fry with rice is roughly 500-600 calories per serving, depending on portion size and oil used."},
+    {
+        "role": "assistant",
+        "content": "A chicken stir-fry with rice is roughly 500-600 calories per serving, depending on portion size and oil used.",
+    },
     {"role": "user", "content": "That sounds good. What time is sunset today?"},
     {"role": "assistant", "content": "Sunset today is at approximately 7:45 PM."},
-    {"role": "user", "content": "Perfect. One more thing -- what day of the week is July 4th this year?"},
+    {
+        "role": "user",
+        "content": "Perfect. One more thing -- what day of the week is July 4th this year?",
+    },
     {"role": "assistant", "content": "July 4th falls on a Friday this year."},
-    {"role": "user", "content": "Nice, long weekend then. Can you summarize what we talked about?"},
-    {"role": "assistant", "content": "We covered tomorrow's weather, set two reminders, calculated tips, discussed Portugal geography, did currency conversions, got a dinner idea, and checked sunset time and July 4th."},
+    {
+        "role": "user",
+        "content": "Nice, long weekend then. Can you summarize what we talked about?",
+    },
+    {
+        "role": "assistant",
+        "content": "We covered tomorrow's weather, set two reminders, calculated tips, discussed Portugal geography, did currency conversions, got a dinner idea, and checked sunset time and July 4th.",
+    },
     {"role": "user", "content": "Great memory! How long have we been chatting?"},
-    {"role": "assistant", "content": "We've had about 20 exchanges so far. Is there anything else you need?"},
+    {
+        "role": "assistant",
+        "content": "We've had about 20 exchanges so far. Is there anything else you need?",
+    },
     {"role": "user", "content": "Nope, that's everything. Thanks!"},
     {"role": "assistant", "content": "You're welcome! Have a great evening."},
     {"role": "user", "content": "Wait, one more -- what's the population of Lisbon?"},
-    {"role": "assistant", "content": "Lisbon's city population is about 550,000, with the metro area around 2.9 million."},
+    {
+        "role": "assistant",
+        "content": "Lisbon's city population is about 550,000, with the metro area around 2.9 million.",
+    },
     {"role": "user", "content": "OK now I'm really done. Bye!"},
     {"role": "assistant", "content": "Goodbye! Enjoy your evening."},
 ]
@@ -100,6 +158,7 @@ _N_HEADS = 32
 @dataclass
 class TurnResult:
     """Result for a single conversation turn."""
+
     turn: int
     kv_dtype: str
     context_tokens: int
@@ -137,8 +196,9 @@ def _simulated_ttfb_ms(context_tokens: int, kv_dtype: str) -> float:
     return base_ms + mem_factor * 8.0  # ~8ms per 1K-equivalent tokens
 
 
-def _simulated_total_latency_ms(context_tokens: int, kv_dtype: str,
-                                 tokens_generated: int) -> float:
+def _simulated_total_latency_ms(
+    context_tokens: int, kv_dtype: str, tokens_generated: int
+) -> float:
     """Estimate total generation latency."""
     ttfb = _simulated_ttfb_ms(context_tokens, kv_dtype)
     # Decode phase: ~10ms per token on A100 7B model
@@ -254,9 +314,13 @@ class MultiTurnBenchmark:
         is_simulated = client is None
 
         if is_simulated:
-            console.print("[yellow]No live server detected -- using simulated results.[/yellow]")
+            console.print(
+                "[yellow]No live server detected -- using simulated results.[/yellow]"
+            )
         else:
-            console.print(f"[green]Connected to live server at {config.host}:{config.port}[/green]")
+            console.print(
+                f"[green]Connected to live server at {config.host}:{config.port}[/green]"
+            )
 
         kv_dtypes = ["fp16", "tq4", "tq3"]
         all_results: list[dict[str, Any]] = []
@@ -266,7 +330,9 @@ class MultiTurnBenchmark:
             messages: list[dict[str, str]] = [
                 {"role": "system", "content": VOICE_AGENT_SYSTEM_PROMPT},
             ]
-            context_tokens = len(VOICE_AGENT_SYSTEM_PROMPT.split()) * 1.3  # rough estimate
+            context_tokens = (
+                len(VOICE_AGENT_SYSTEM_PROMPT.split()) * 1.3
+            )  # rough estimate
 
             for turn_idx, user_msg in enumerate(_USER_TURNS, start=1):
                 messages.append(user_msg)
@@ -274,7 +340,9 @@ class MultiTurnBenchmark:
 
                 if is_simulated:
                     result = self._run_simulated_turn(
-                        turn_idx, int(context_tokens), kv_dtype,
+                        turn_idx,
+                        int(context_tokens),
+                        kv_dtype,
                     )
                 else:
                     result = self._run_live_turn(client, messages, config)
@@ -285,7 +353,12 @@ class MultiTurnBenchmark:
                 context_tokens += result["tokens_generated"]
 
                 ratio = _compression_ratio(kv_dtype)
-                fp16_bytes = int(context_tokens) * _FP16_BYTES_PER_TOKEN_PER_LAYER * _N_LAYERS * _N_HEADS
+                fp16_bytes = (
+                    int(context_tokens)
+                    * _FP16_BYTES_PER_TOKEN_PER_LAYER
+                    * _N_LAYERS
+                    * _N_HEADS
+                )
                 kv_bytes = int(fp16_bytes / ratio)
 
                 turn_result = {
