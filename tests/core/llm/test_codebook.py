@@ -13,7 +13,6 @@ import math
 
 import pytest
 import torch
-
 from voicequant.core.codebook import LloydMaxCodebook
 
 
@@ -56,7 +55,7 @@ def test_distortion_within_paper_bound(bits):
     """MSE distortion per vector <= sqrt(3) * pi/2 * (1/4^b) for unit vectors."""
     d = 128
     cb = LloydMaxCodebook(d, bits)
-    sigma = 1.0 / math.sqrt(d)
+    sigma = 1.0 / math.sqrt(d)  # noqa: F841
 
     n_samples = 5000
     x = torch.randn(n_samples, d)

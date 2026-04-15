@@ -66,7 +66,7 @@ def test_needle_retrieval_through_full_pipeline():
 
     K = torch.randn(seq_k, d)
     K = K / torch.norm(K, dim=-1, keepdim=True)
-    V = torch.randn(seq_k, d)
+    V = torch.randn(seq_k, d)  # noqa: F841
 
     needle_pos = 171
     Q = K[needle_pos].unsqueeze(0) * 3.0

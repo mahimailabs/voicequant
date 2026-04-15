@@ -28,21 +28,51 @@ def create_app(config: ServerConfig) -> Any:
     )
 
     engine = None
+    stt_engine = None
     registry = EngineRegistry()
     metrics_registry = MetricsRegistry()
 
     def _get_engine():
         return engine
 
+    def _get_stt_engine():
+        return stt_engine
+
+    # Conditional STT mount decided at app-build time. Requires both our
+    # engine module AND the faster_whisper backend to be importable.
+    stt_available = False
+    try:
+        import faster_whisper  # noqa: F401
+
+        from voicequant.core.stt.engine import STTEngine  # noqa: F401
+
+        stt_available = True
+    except ImportError:
+        stt_available = False
+
     @app.on_event("startup")
     async def startup() -> None:
-        nonlocal engine
+        nonlocal engine, stt_engine
         from voicequant.server.engine import VoiceQuantEngine
 
-        engine = VoiceQuantEngine(config)
-        await engine.initialize()
-        registry.register_engine("llm", engine)
-        metrics_registry.register_modality("llm", engine.metrics)
+        try:
+            engine = VoiceQuantEngine(config)
+            await engine.initialize()
+            registry.register_engine("llm", engine)
+            metrics_registry.register_modality("llm", engine.metrics)
+        except ImportError:
+            engine = None  # vLLM not installed; LLM routes degrade gracefully
+
+        if stt_available:
+            from voicequant.core.stt.config import STTConfig
+            from voicequant.core.stt.engine import STTEngine
+
+            stt_cfg = (
+                STTConfig(**config.stt_config) if config.stt_config else STTConfig()
+            )
+            stt_engine = STTEngine(stt_cfg)
+            registry.register_engine("stt", stt_engine)
+            metrics_registry.register_modality("stt", stt_engine.metrics)
 
     # Always-on routers
     app.include_router(llm_routes.build_router(config, _get_engine))
@@ -50,15 +80,15 @@ def create_app(config: ServerConfig) -> Any:
         capacity_routes.build_router(config, _get_engine, metrics_registry)
     )
 
-    # Conditional STT mount: real engine if present, else stub
-    try:
-        from voicequant.core.stt.engine import STTEngine  # noqa: F401
-        from voicequant.server.routes.stt_real import (
-            router as stt_router,  # type: ignore
-        )
-    except ImportError:
-        from voicequant.server.routes.stt import router as stt_router
-    app.include_router(stt_router)
+    # Conditional STT mount: real router if engine module is importable, else stub
+    if stt_available:
+        from voicequant.server.routes.stt import build_router as build_stt_router
+
+        app.include_router(build_stt_router(_get_stt_engine))
+    else:
+        from voicequant.server.routes.stt_stub import router as stt_router
+
+        app.include_router(stt_router)
 
     # Conditional TTS mount
     try:
@@ -67,7 +97,7 @@ def create_app(config: ServerConfig) -> Any:
             router as tts_router,  # type: ignore
         )
     except ImportError:
-        from voicequant.server.routes.tts import router as tts_router
+        from voicequant.server.routes.tts_stub import router as tts_router
     app.include_router(tts_router)
 
     # Expose on app.state for tests / introspection

@@ -2,7 +2,6 @@
 
 import pytest
 import torch
-
 from voicequant.core.config import TurboQuantConfig
 from voicequant.core.wrapper import TurboQuantWrapper
 
@@ -82,7 +81,7 @@ class TestTurboQuantWrapper:
         K = torch.randn(32, 128, dtype=torch.float16)
         V = torch.randn(32, 128, dtype=torch.float16)
 
-        ck = wrapper.engine.compress_keys_pytorch(K)
+        ck = wrapper.engine.compress_keys_pytorch(K)  # noqa: F841
         cv = wrapper.engine.compress_values_pytorch(V)
         V_recon = wrapper.engine.decompress_values_pytorch(cv)
 

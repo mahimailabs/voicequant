@@ -46,10 +46,17 @@ bench = [
     "matplotlib>=3.8.0",
 ]
 viz = ["matplotlib>=3.8.0"]
+stt = [
+    "faster-whisper>=1.0.0",
+    "soundfile>=0.12.0",
+]
 modal = ["modal>=0.70.0"]
 runpod = ["runpod>=1.7.0"]
+voice = [
+    "voicequant[stt]",
+]
 all = [
-    "voicequant[serve,bench,modal]",
+    "voicequant[serve,bench,stt,modal]",
 ]
 
 [project.scripts]

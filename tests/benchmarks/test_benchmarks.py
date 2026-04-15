@@ -4,7 +4,11 @@ import json
 from pathlib import Path
 
 PROMPTS_DIR = (
-    Path(__file__).parent.parent / "src" / "voicequant" / "benchmarks" / "prompts"
+    Path(__file__).parent.parent.parent
+    / "src"
+    / "voicequant"
+    / "benchmarks"
+    / "prompts"
 )
 
 
