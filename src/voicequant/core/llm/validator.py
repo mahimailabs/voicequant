@@ -11,8 +11,8 @@ import torch.nn.functional as F
 from rich.console import Console
 from rich.table import Table
 
-from voicequant.core.config import TurboQuantConfig
-from voicequant.core.wrapper import TurboQuantWrapper
+from voicequant.core.llm.config import TurboQuantConfig
+from voicequant.core.llm.wrapper import TurboQuantWrapper
 
 console = Console()
 

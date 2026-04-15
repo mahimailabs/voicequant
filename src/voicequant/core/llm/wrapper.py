@@ -11,8 +11,8 @@ from typing import Any
 import torch
 from rich.console import Console
 
-from voicequant.core.engine import TurboQuantEngine
-from voicequant.core.config import TurboQuantConfig
+from voicequant.core.llm.engine import TurboQuantEngine
+from voicequant.core.llm.config import TurboQuantConfig
 
 console = Console()
 
