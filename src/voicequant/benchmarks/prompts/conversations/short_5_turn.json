@@ -1,0 +1,46 @@
+{
+  "name": "Short 5-Turn Conversation",
+  "system_prompt_file": "short_system.txt",
+  "turns": [
+    {
+      "role": "user",
+      "content": "Hey, what's the capital of Japan?"
+    },
+    {
+      "role": "assistant",
+      "content": "The capital of Japan is Tokyo."
+    },
+    {
+      "role": "user",
+      "content": "Cool. What time zone is Tokyo in?"
+    },
+    {
+      "role": "assistant",
+      "content": "Tokyo is in Japan Standard Time, which is UTC plus nine hours. They don't observe daylight saving time."
+    },
+    {
+      "role": "user",
+      "content": "Can you convert 72 degrees Fahrenheit to Celsius for me?"
+    },
+    {
+      "role": "assistant",
+      "content": "72 degrees Fahrenheit is about 22.2 degrees Celsius."
+    },
+    {
+      "role": "user",
+      "content": "What's 15 percent of 240?"
+    },
+    {
+      "role": "assistant",
+      "content": "15 percent of 240 is 36."
+    },
+    {
+      "role": "user",
+      "content": "Thanks, that's all I needed."
+    },
+    {
+      "role": "assistant",
+      "content": "You're welcome! Have a good one."
+    }
+  ]
+}

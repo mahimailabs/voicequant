@@ -1,0 +1,133 @@
+{
+  "name": "Medium 10-Turn Conversation",
+  "system_prompt_file": "medium_system.txt",
+  "turns": [
+    {
+      "role": "user",
+      "content": "Hey Atlas, what's the weather usually like in Seattle in April?"
+    },
+    {
+      "role": "assistant",
+      "content": "April in Seattle is a bit of a mixed bag. You'll typically see highs around 55 to 60 degrees Fahrenheit with a fair amount of rain, though you start getting more sunny breaks compared to winter. I'd recommend layers and a rain jacket if you're heading there."
+    },
+    {
+      "role": "user",
+      "content": "Good to know. I'm planning a trip there next week actually. Can you remind me tomorrow at 8 AM to book the hotel?"
+    },
+    {
+      "role": "assistant",
+      "content": "Sure, let me set that up for you.",
+      "tool_calls": [
+        {
+          "id": "call_101",
+          "function": {
+            "name": "set_reminder",
+            "arguments": {
+              "message": "Book hotel for Seattle trip",
+              "time": "2026-04-10T08:00:00",
+              "recurring": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_101",
+      "content": "{\"status\": \"created\", \"reminder_id\": \"rem_0042\", \"fire_at\": \"2026-04-10T08:00:00\"}"
+    },
+    {
+      "role": "assistant",
+      "content": "All set. You'll get a reminder tomorrow at 8 AM to book the hotel."
+    },
+    {
+      "role": "user",
+      "content": "Perfect. Oh, completely different question — how many kilometers is a marathon?"
+    },
+    {
+      "role": "assistant",
+      "content": "A marathon is 42.195 kilometers, or about 26.2 miles."
+    },
+    {
+      "role": "user",
+      "content": "And what's the world record for it?"
+    },
+    {
+      "role": "assistant",
+      "content": "Let me look that up.",
+      "tool_calls": [
+        {
+          "id": "call_102",
+          "function": {
+            "name": "search_knowledge_base",
+            "arguments": {
+              "query": "marathon world record time",
+              "max_results": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_102",
+      "content": "{\"results\": [{\"title\": \"Marathon World Record\", \"summary\": \"The men's marathon world record is 2:00:35, set by Kelvin Kiptum at the 2023 Chicago Marathon. The women's record is 2:11:53, set by Tigst Assefa at the 2023 Berlin Marathon.\"}]}"
+    },
+    {
+      "role": "assistant",
+      "content": "The men's world record is 2 hours and 35 seconds, set by Kelvin Kiptum at the 2023 Chicago Marathon. On the women's side, Tigst Assefa holds the record at 2 hours 11 minutes and 53 seconds from the 2023 Berlin Marathon."
+    },
+    {
+      "role": "user",
+      "content": "Wow that's fast. What's 42.195 divided by 2.0097? I want to know the average speed in kilometers per hour roughly."
+    },
+    {
+      "role": "assistant",
+      "content": "That comes out to about 21 kilometers per hour. So roughly a 2 minute and 51 second pace per kilometer, sustained for the entire race. Pretty incredible."
+    },
+    {
+      "role": "user",
+      "content": "Definitely. Alright, switching topics again — what time is it right now in London?"
+    },
+    {
+      "role": "assistant",
+      "content": "Let me check.",
+      "tool_calls": [
+        {
+          "id": "call_103",
+          "function": {
+            "name": "get_time",
+            "arguments": {
+              "timezone": "Europe/London"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_103",
+      "content": "{\"datetime\": \"2026-04-09T22:14:30+01:00\", \"timezone\": \"Europe/London\", \"utc_offset\": \"+01:00\"}"
+    },
+    {
+      "role": "assistant",
+      "content": "It's currently about 10:14 PM in London. They're on British Summer Time right now, which is one hour ahead of UTC."
+    },
+    {
+      "role": "user",
+      "content": "Got it. One more thing — I always mix up the difference between the UK, Great Britain, and England. Can you clarify that?"
+    },
+    {
+      "role": "assistant",
+      "content": "Sure. England is just one country. Great Britain is the island that contains three countries: England, Scotland, and Wales. The United Kingdom, or the UK, includes those three plus Northern Ireland. So the UK is the full political entity, Great Britain is the main island, and England is one part of it."
+    },
+    {
+      "role": "user",
+      "content": "That's really clear, thanks. I think that's everything for now."
+    },
+    {
+      "role": "assistant",
+      "content": "Glad I could help! Enjoy your Seattle trip, and don't forget to check that reminder tomorrow morning. Talk to you later."
+    }
+  ]
+}

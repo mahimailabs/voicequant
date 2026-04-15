@@ -1,0 +1,482 @@
+{
+  "name": "Long 20-Turn Conversation",
+  "system_prompt_file": "long_system.txt",
+  "turns": [
+    {
+      "role": "user",
+      "content": "Hey Atlas, I need help planning my day. I've got a bunch of things to do and I'm not sure how to prioritize."
+    },
+    {
+      "role": "assistant",
+      "content": "Sure, I can help with that. Why don't you tell me what's on your plate and we'll figure out an order that makes sense."
+    },
+    {
+      "role": "user",
+      "content": "Okay so I need to go grocery shopping, pick up my dry cleaning before 5 PM, finish a report for work that's due tomorrow, call my mom, and I was hoping to get a 30-minute run in."
+    },
+    {
+      "role": "assistant",
+      "content": "Alright, so you've got five things. The report has the hardest deadline since it's due tomorrow, and the dry cleaning has a time constraint at 5 PM. I'd suggest tackling the report first while you're fresh, then do your run as a midday break, grab the dry cleaning and groceries in one trip since those are both errands, and call your mom whenever you have a free moment — maybe while you're driving to the store. Does that flow work for you?"
+    },
+    {
+      "role": "user",
+      "content": "Yeah that makes sense. Actually, what time is it right now?"
+    },
+    {
+      "role": "assistant",
+      "content": "Let me check.",
+      "tool_calls": [
+        {
+          "id": "call_201",
+          "function": {
+            "name": "get_time",
+            "arguments": {
+              "timezone": "America/New_York"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_201",
+      "content": "{\"datetime\": \"2026-04-09T09:22:15-04:00\", \"timezone\": \"America/New_York\", \"utc_offset\": \"-04:00\"}"
+    },
+    {
+      "role": "assistant",
+      "content": "It's about 9:22 AM Eastern. So you've got a solid chunk of time before the dry cleaning deadline. If you start the report now, you could probably get your run in by noon and handle the errands in the early afternoon."
+    },
+    {
+      "role": "user",
+      "content": "Good plan. Can you set a reminder for 3:30 PM to leave for the dry cleaner?"
+    },
+    {
+      "role": "assistant",
+      "content": "On it.",
+      "tool_calls": [
+        {
+          "id": "call_202",
+          "function": {
+            "name": "set_reminder",
+            "arguments": {
+              "message": "Leave for the dry cleaner — closes at 5 PM",
+              "time": "2026-04-09T15:30:00-04:00",
+              "recurring": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_202",
+      "content": "{\"status\": \"created\", \"reminder_id\": \"rem_0101\", \"fire_at\": \"2026-04-09T15:30:00-04:00\"}"
+    },
+    {
+      "role": "assistant",
+      "content": "Done. You'll get a reminder at 3:30 PM to head to the dry cleaner."
+    },
+    {
+      "role": "user",
+      "content": "Great. Oh, while I'm thinking about groceries, can you start a grocery list for me? I need eggs, milk, bread, chicken, and spinach."
+    },
+    {
+      "role": "assistant",
+      "content": "Sure, let me create that.",
+      "tool_calls": [
+        {
+          "id": "call_203",
+          "function": {
+            "name": "manage_list",
+            "arguments": {
+              "action": "create",
+              "list_name": "grocery list"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_203",
+      "content": "{\"status\": \"created\", \"list_name\": \"grocery list\", \"items\": []}"
+    },
+    {
+      "role": "assistant",
+      "content": "List created. Now let me add those items.",
+      "tool_calls": [
+        {
+          "id": "call_204a",
+          "function": {
+            "name": "manage_list",
+            "arguments": {
+              "action": "add_item",
+              "list_name": "grocery list",
+              "item": "eggs"
+            }
+          }
+        },
+        {
+          "id": "call_204b",
+          "function": {
+            "name": "manage_list",
+            "arguments": {
+              "action": "add_item",
+              "list_name": "grocery list",
+              "item": "milk"
+            }
+          }
+        },
+        {
+          "id": "call_204c",
+          "function": {
+            "name": "manage_list",
+            "arguments": {
+              "action": "add_item",
+              "list_name": "grocery list",
+              "item": "bread"
+            }
+          }
+        },
+        {
+          "id": "call_204d",
+          "function": {
+            "name": "manage_list",
+            "arguments": {
+              "action": "add_item",
+              "list_name": "grocery list",
+              "item": "chicken"
+            }
+          }
+        },
+        {
+          "id": "call_204e",
+          "function": {
+            "name": "manage_list",
+            "arguments": {
+              "action": "add_item",
+              "list_name": "grocery list",
+              "item": "spinach"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_204e",
+      "content": "{\"status\": \"updated\", \"list_name\": \"grocery list\", \"items\": [\"eggs\", \"milk\", \"bread\", \"chicken\", \"spinach\"]}"
+    },
+    {
+      "role": "assistant",
+      "content": "Your grocery list now has eggs, milk, bread, chicken, and spinach. Just let me know if you think of anything else to add."
+    },
+    {
+      "role": "user",
+      "content": "Actually add rice and olive oil too."
+    },
+    {
+      "role": "assistant",
+      "content": "Adding those now.",
+      "tool_calls": [
+        {
+          "id": "call_205a",
+          "function": {
+            "name": "manage_list",
+            "arguments": {
+              "action": "add_item",
+              "list_name": "grocery list",
+              "item": "rice"
+            }
+          }
+        },
+        {
+          "id": "call_205b",
+          "function": {
+            "name": "manage_list",
+            "arguments": {
+              "action": "add_item",
+              "list_name": "grocery list",
+              "item": "olive oil"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_205b",
+      "content": "{\"status\": \"updated\", \"list_name\": \"grocery list\", \"items\": [\"eggs\", \"milk\", \"bread\", \"chicken\", \"spinach\", \"rice\", \"olive oil\"]}"
+    },
+    {
+      "role": "assistant",
+      "content": "Done. Rice and olive oil are on the list. You're at seven items now."
+    },
+    {
+      "role": "user",
+      "content": "Perfect. Totally different question — I was reading something about the speed of light. How fast is it in miles per hour?"
+    },
+    {
+      "role": "assistant",
+      "content": "The speed of light is roughly 670,616,629 miles per hour. That's about 186,282 miles per second. To put it in perspective, light could travel around the Earth's equator about 7.5 times in a single second."
+    },
+    {
+      "role": "user",
+      "content": "Wild. How long does it take light from the Sun to reach Earth?"
+    },
+    {
+      "role": "assistant",
+      "content": "About 8 minutes and 20 seconds on average. The distance varies a bit throughout the year since Earth's orbit is slightly elliptical, but that's the ballpark figure."
+    },
+    {
+      "role": "user",
+      "content": "Can you convert 93 million miles to kilometers for me? I think that's the distance."
+    },
+    {
+      "role": "assistant",
+      "content": "Let me convert that.",
+      "tool_calls": [
+        {
+          "id": "call_206",
+          "function": {
+            "name": "convert_units",
+            "arguments": {
+              "value": 93000000,
+              "from_unit": "miles",
+              "to_unit": "kilometers"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_206",
+      "content": "{\"result\": 149668992, \"from\": \"93000000 miles\", \"to\": \"149668992 kilometers\"}"
+    },
+    {
+      "role": "assistant",
+      "content": "93 million miles is about 149.7 million kilometers. The commonly cited figure is about 150 million kilometers, or one astronomical unit, so your number is right on the mark."
+    },
+    {
+      "role": "user",
+      "content": "Cool. Going back to my day — for my run, I usually do about a 9-minute mile pace. If I want to run for 30 minutes, how far will I go?"
+    },
+    {
+      "role": "assistant",
+      "content": "Let me figure that out.",
+      "tool_calls": [
+        {
+          "id": "call_207",
+          "function": {
+            "name": "calculate",
+            "arguments": {
+              "expression": "30 / 9"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_207",
+      "content": "{\"result\": 3.3333333333333335}"
+    },
+    {
+      "role": "assistant",
+      "content": "At a 9-minute mile pace, a 30-minute run will cover about 3.3 miles. That's a solid midday workout."
+    },
+    {
+      "role": "user",
+      "content": "Nice. Can you set a 5-minute timer? I'm going to take a quick coffee break before I start the report."
+    },
+    {
+      "role": "assistant",
+      "content": "You got it.",
+      "tool_calls": [
+        {
+          "id": "call_208",
+          "function": {
+            "name": "set_timer",
+            "arguments": {
+              "duration_seconds": 300,
+              "label": "Coffee break"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_208",
+      "content": "{\"status\": \"started\", \"timer_id\": \"tmr_0055\", \"duration_seconds\": 300, \"label\": \"Coffee break\"}"
+    },
+    {
+      "role": "assistant",
+      "content": "Five-minute coffee break timer is running. I'll let you know when it's up."
+    },
+    {
+      "role": "user",
+      "content": "Thanks. While I'm waiting — who invented the internet? I was arguing about this with a friend yesterday."
+    },
+    {
+      "role": "assistant",
+      "content": "Let me pull up the details on that.",
+      "tool_calls": [
+        {
+          "id": "call_209",
+          "function": {
+            "name": "search_knowledge_base",
+            "arguments": {
+              "query": "who invented the internet history",
+              "max_results": 2
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_209",
+      "content": "{\"results\": [{\"title\": \"History of the Internet\", \"summary\": \"The internet evolved from ARPANET, a U.S. Department of Defense project launched in 1969. Key figures include Vint Cerf and Bob Kahn, who developed TCP/IP in the 1970s, and Tim Berners-Lee, who invented the World Wide Web in 1989. No single person invented the internet; it was a collaborative effort spanning decades.\"}, {\"title\": \"ARPANET\", \"summary\": \"ARPANET was the first wide-area packet-switching network and the predecessor of the modern internet. It was funded by DARPA and first connected UCLA, Stanford, UC Santa Barbara, and the University of Utah in 1969.\"}]}"
+    },
+    {
+      "role": "assistant",
+      "content": "There's no single inventor — it was a collaborative effort over decades. The internet grew out of ARPANET, a U.S. Defense Department project that first connected four universities in 1969. Vint Cerf and Bob Kahn are often credited as key figures because they developed TCP/IP, the core protocol that makes the internet work. Tim Berners-Lee is sometimes mentioned, but he specifically invented the World Wide Web in 1989, which is how most people access the internet but isn't the internet itself. So if your friend says one specific person invented it, the accurate answer is that it was a team effort."
+    },
+    {
+      "role": "user",
+      "content": "That's exactly what I told him. He kept saying it was Al Gore."
+    },
+    {
+      "role": "assistant",
+      "content": "That's a common joke, but it comes from a misquote. Al Gore said in a 1999 interview that he \"took the initiative in creating the internet,\" meaning he championed legislation that funded its expansion as a senator in the 1980s and 90s. Cerf and Kahn have actually acknowledged that Gore's political support was important. But he didn't claim to invent it — that's just how the soundbite got twisted over the years."
+    },
+    {
+      "role": "user",
+      "content": "Ha, good to know. Alright, let me read back my grocery list one more time before I forget."
+    },
+    {
+      "role": "assistant",
+      "content": "Let me pull it up.",
+      "tool_calls": [
+        {
+          "id": "call_210",
+          "function": {
+            "name": "manage_list",
+            "arguments": {
+              "action": "read",
+              "list_name": "grocery list"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_210",
+      "content": "{\"list_name\": \"grocery list\", \"items\": [\"eggs\", \"milk\", \"bread\", \"chicken\", \"spinach\", \"rice\", \"olive oil\"]}"
+    },
+    {
+      "role": "assistant",
+      "content": "Your grocery list has seven items: eggs, milk, bread, chicken, spinach, rice, and olive oil. Want to add or change anything?"
+    },
+    {
+      "role": "user",
+      "content": "Nope, that looks right. Oh wait, actually remove the milk. I just remembered we still have a full carton."
+    },
+    {
+      "role": "assistant",
+      "content": "Got it.",
+      "tool_calls": [
+        {
+          "id": "call_211",
+          "function": {
+            "name": "manage_list",
+            "arguments": {
+              "action": "remove_item",
+              "list_name": "grocery list",
+              "item": "milk"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_211",
+      "content": "{\"status\": \"updated\", \"list_name\": \"grocery list\", \"items\": [\"eggs\", \"bread\", \"chicken\", \"spinach\", \"rice\", \"olive oil\"]}"
+    },
+    {
+      "role": "assistant",
+      "content": "Milk is off the list. You're down to six items now: eggs, bread, chicken, spinach, rice, and olive oil."
+    },
+    {
+      "role": "user",
+      "content": "Perfect. What's the weather looking like for this afternoon? I want to know if I should run outside or use the treadmill."
+    },
+    {
+      "role": "assistant",
+      "content": "Let me check.",
+      "tool_calls": [
+        {
+          "id": "call_212",
+          "function": {
+            "name": "get_weather",
+            "arguments": {
+              "location": "New York",
+              "forecast_days": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_212",
+      "content": "{\"location\": \"New York, NY\", \"temperature_f\": 58, \"condition\": \"Partly cloudy\", \"humidity\": 45, \"wind_mph\": 8, \"precipitation_chance\": 10}"
+    },
+    {
+      "role": "assistant",
+      "content": "It's 58 degrees and partly cloudy in New York right now with a light 8 mile-per-hour wind. Only a 10 percent chance of rain. Sounds like great conditions for an outdoor run."
+    },
+    {
+      "role": "user",
+      "content": "Nice, outdoor it is. One last thing — earlier you said my report is due tomorrow. Can you set a reminder for tonight at 9 PM to do a final proofread?"
+    },
+    {
+      "role": "assistant",
+      "content": "Absolutely.",
+      "tool_calls": [
+        {
+          "id": "call_213",
+          "function": {
+            "name": "set_reminder",
+            "arguments": {
+              "message": "Final proofread of work report — due tomorrow",
+              "time": "2026-04-09T21:00:00-04:00",
+              "recurring": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_213",
+      "content": "{\"status\": \"created\", \"reminder_id\": \"rem_0102\", \"fire_at\": \"2026-04-09T21:00:00-04:00\"}"
+    },
+    {
+      "role": "assistant",
+      "content": "You'll get a reminder at 9 PM tonight to proofread your report. So to recap your day: report first, run around midday since the weather's good, dry cleaning and groceries in the afternoon with your 3:30 reminder, call your mom when you have a free moment, and a final proofread at 9 tonight. Sound like a plan?"
+    },
+    {
+      "role": "user",
+      "content": "That's perfect, Atlas. You've been super helpful. Talk to you later."
+    },
+    {
+      "role": "assistant",
+      "content": "Have a great day! Good luck with the report, and enjoy the run. I'll be here if you need anything."
+    }
+  ]
+}

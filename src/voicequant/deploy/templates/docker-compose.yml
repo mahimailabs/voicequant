@@ -1,0 +1,71 @@
+# VoiceQuant Docker Compose — Local GPU Development
+#
+# Starts a VoiceQuant inference server with GPU access for local
+# development and testing. Provides an OpenAI-compatible API at
+# http://localhost:8000/v1/chat/completions.
+#
+# Usage:
+#   docker compose up --build          # build and start
+#   docker compose up -d               # start in background
+#   docker compose logs -f voicequant  # follow logs
+#   docker compose down                # stop
+#
+# Prerequisites:
+#   - NVIDIA Container Toolkit installed (nvidia-docker2 or nvidia-container-toolkit)
+#   - At least one NVIDIA GPU visible to Docker
+#
+# Test:
+#   curl http://localhost:8000/v1/health
+#   curl http://localhost:8000/v1/capacity
+#   curl -X POST http://localhost:8000/v1/chat/completions \
+#       -H "Content-Type: application/json" \
+#       -d '{"model":"default","messages":[{"role":"user","content":"Hello"}]}'
+
+services:
+  voicequant:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: voicequant:latest
+    container_name: voicequant-server
+
+    # GPU access: reserve all available GPUs
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    # Port mapping: host 8000 -> container 8000
+    ports:
+      - "8000:8000"
+
+    # Model weight cache persisted on the host
+    volumes:
+      - model-cache:/root/.cache/huggingface
+
+    # Server configuration via environment variables
+    environment:
+      - VOICEQUANT_MODEL=${VOICEQUANT_MODEL:-Qwen/Qwen2.5-7B-Instruct-AWQ}
+      - VOICEQUANT_TQ_BITS=${VOICEQUANT_TQ_BITS:-4}
+      - VOICEQUANT_RESIDUAL_WINDOW=${VOICEQUANT_RESIDUAL_WINDOW:-256}
+      - VOICEQUANT_MAX_CONCURRENT=${VOICEQUANT_MAX_CONCURRENT:-64}
+      - VOICEQUANT_GPU_MEMORY=${VOICEQUANT_GPU_MEMORY:-0.90}
+      - HF_TOKEN=${HF_TOKEN:-}
+
+    # Health check: wait for the model to load before marking as healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v1/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 5
+
+    # Restart on failure (but not on manual stop)
+    restart: unless-stopped
+
+volumes:
+  model-cache:
+    driver: local
