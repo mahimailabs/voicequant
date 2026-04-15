@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -45,3 +46,22 @@ class MetricsCollector:
             "avg_ratio": sum(ratios) / len(ratios),
             "avg_compress_ms": sum(times) / len(times),
         }
+
+
+class MetricsRegistry:
+    """Registry of per-modality metric collector callables."""
+
+    def __init__(self) -> None:
+        self._collectors: dict[str, Callable[[], dict[str, float]]] = {}
+
+    def register_modality(
+        self, modality: str, collector_fn: Callable[[], dict[str, float]]
+    ) -> None:
+        self._collectors[modality] = collector_fn
+
+    def collect_all(self) -> dict[str, float]:
+        merged: dict[str, float] = {}
+        for modality, fn in self._collectors.items():
+            for k, v in fn().items():
+                merged[f"{modality}_{k}"] = v
+        return merged

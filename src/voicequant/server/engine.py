@@ -10,13 +10,46 @@ integration strategies:
 from __future__ import annotations
 
 import time
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
 
 from rich.console import Console
 
+from voicequant.core.protocol import CapacityReport, HealthStatus, ModalityEngine
 from voicequant.server.config import ServerConfig
 
 console = Console()
+
+
+class EngineRegistry:
+    """Registry of modality engines (llm, stt, tts, ...)."""
+
+    def __init__(self) -> None:
+        self._engines: dict[str, ModalityEngine] = {}
+
+    def register_engine(self, modality: str, engine: ModalityEngine) -> None:
+        self._engines[modality] = engine
+
+    def get_engine(self, modality: str) -> ModalityEngine:
+        if modality not in self._engines:
+            raise KeyError(f"Modality not registered: {modality}")
+        return self._engines[modality]
+
+    def has(self, modality: str) -> bool:
+        return modality in self._engines
+
+    def health_all(self) -> dict[str, HealthStatus]:
+        return {m: e.health() for m, e in self._engines.items()}
+
+    def capacity_all(self) -> dict[str, CapacityReport]:
+        return {m: e.capacity() for m, e in self._engines.items()}
+
+    def metrics_all(self) -> dict[str, float]:
+        merged: dict[str, float] = {}
+        for modality, engine in self._engines.items():
+            for k, v in engine.metrics().items():
+                merged[f"{modality}_{k}"] = v
+        return merged
 
 
 class VoiceQuantEngine:
@@ -41,7 +74,7 @@ class VoiceQuantEngine:
     async def initialize(self) -> None:
         """Initialize the vLLM engine with TurboQuant configuration."""
         try:
-            from vllm import AsyncLLMEngine, AsyncEngineArgs
+            from vllm import AsyncEngineArgs, AsyncLLMEngine
 
             engine_args = AsyncEngineArgs(
                 model=self.config.model,
@@ -60,7 +93,9 @@ class VoiceQuantEngine:
             console.print(f"[green]KV cache: {self.config.kv_cache_dtype}[/green]")
 
         except ImportError:
-            console.print("[yellow]vLLM not available. Server requires 'pip install voicequant[serve]'[/yellow]")
+            console.print(
+                "[yellow]vLLM not available. Server requires 'pip install voicequant[serve]'[/yellow]"
+            )
             raise
 
     async def generate(
@@ -88,7 +123,9 @@ class VoiceQuantEngine:
         from vllm import SamplingParams
 
         max_tokens = max_tokens or self.config.default_max_tokens
-        temperature = temperature if temperature is not None else self.config.temperature
+        temperature = (
+            temperature if temperature is not None else self.config.temperature
+        )
 
         sampling_params = SamplingParams(
             max_tokens=max_tokens,
@@ -112,11 +149,13 @@ class VoiceQuantEngine:
                 yield {
                     "id": request_id,
                     "object": "chat.completion.chunk",
-                    "choices": [{
-                        "index": 0,
-                        "delta": {"content": output.outputs[0].text},
-                        "finish_reason": output.outputs[0].finish_reason,
-                    }],
+                    "choices": [
+                        {
+                            "index": 0,
+                            "delta": {"content": output.outputs[0].text},
+                            "finish_reason": output.outputs[0].finish_reason,
+                        }
+                    ],
                 }
 
         ttfb = (first_token_time - start_time) if first_token_time else 0
@@ -128,11 +167,16 @@ class VoiceQuantEngine:
             yield {
                 "id": request_id,
                 "object": "chat.completion",
-                "choices": [{
-                    "index": 0,
-                    "message": {"role": "assistant", "content": output.outputs[0].text},
-                    "finish_reason": output.outputs[0].finish_reason,
-                }],
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": output.outputs[0].text,
+                        },
+                        "finish_reason": output.outputs[0].finish_reason,
+                    }
+                ],
                 "usage": {
                     "completion_tokens": n_tokens,
                     "total_tokens": n_tokens,
@@ -148,7 +192,9 @@ class VoiceQuantEngine:
         """Apply chat template to messages."""
         if self._tokenizer is not None:
             return self._tokenizer.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True,
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
             )
         # Fallback: simple concatenation
         parts = []
@@ -182,9 +228,10 @@ class VoiceQuantEngine:
 
         try:
             import torch
+
             if torch.cuda.is_available():
-                mem_allocated = torch.cuda.memory_allocated() / (1024 ** 3)
-                mem_total = torch.cuda.get_device_properties(0).total_mem / (1024 ** 3)
+                mem_allocated = torch.cuda.memory_allocated() / (1024**3)
+                mem_total = torch.cuda.get_device_properties(0).total_mem / (1024**3)
                 health["gpu"] = {
                     "name": torch.cuda.get_device_name(),
                     "memory_allocated_gb": round(mem_allocated, 2),
@@ -195,3 +242,32 @@ class VoiceQuantEngine:
             health["gpu"] = None
 
         return health
+
+    # --- ModalityEngine protocol ---
+
+    def health(self) -> HealthStatus:
+        detail = "model_loaded" if self._model_loaded else "loading"
+        return HealthStatus(healthy=self._model_loaded, modality="llm", detail=detail)
+
+    def capacity(self) -> CapacityReport:
+        active = self._request_count
+        headroom = max(0, self.config.max_num_seqs - active)
+        saturated = active >= self.config.max_num_seqs
+        uptime = time.time() - self._start_time
+        tps = self._total_tokens / uptime if uptime > 0 else 0.0
+        return CapacityReport(
+            active=active, headroom=headroom, saturated=saturated, latency_metric=tps
+        )
+
+    def metrics(self) -> dict[str, float]:
+        uptime = time.time() - self._start_time
+        return {
+            "request_count": float(self._request_count),
+            "total_tokens": float(self._total_tokens),
+            "uptime_seconds": float(uptime),
+            "model_loaded": float(1 if self._model_loaded else 0),
+        }
+
+    def shutdown(self) -> None:
+        self._engine = None
+        self._model_loaded = False
