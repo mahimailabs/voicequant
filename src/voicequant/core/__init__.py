@@ -1,12 +1,19 @@
 """VoiceQuant core — TurboQuant compression engine."""
 
+from __future__ import annotations
+
 import importlib as _importlib
 import sys as _sys
 
 for _name in ("engine", "codebook", "config", "constants", "wrapper", "validator"):
-    _sys.modules[f"voicequant.core.{_name}"] = _importlib.import_module(
-        f"voicequant.core.llm.{_name}"
-    )
+    try:
+        _sys.modules[f"voicequant.core.{_name}"] = _importlib.import_module(
+            f"voicequant.core.llm.{_name}"
+        )
+    except ImportError:
+        # Keep package importable in minimal environments where optional
+        # heavy deps (torch/scipy) are not installed yet.
+        pass
 
 
 def __getattr__(name: str):
@@ -32,11 +39,6 @@ def __getattr__(name: str):
         return TurboQuantWrapper
     raise AttributeError(f"module 'voicequant.core' has no attribute {name!r}")
 
-
-from voicequant.core.llm.codebook import LloydMaxCodebook  # noqa: E402
-from voicequant.core.llm.config import TurboQuantConfig  # noqa: E402
-from voicequant.core.llm.engine import TurboQuantEngine  # noqa: E402
-from voicequant.core.llm.wrapper import TurboQuantWrapper  # noqa: E402
 
 __all__ = [
     "TurboQuantEngine",

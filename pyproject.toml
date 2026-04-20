@@ -50,13 +50,18 @@ stt = [
     "faster-whisper>=1.0.0",
     "soundfile>=0.12.0",
 ]
+tts = [
+    "kokoro-onnx>=0.3.0",
+    "soundfile>=0.12.0",
+    "numpy>=1.24.0",
+]
 modal = ["modal>=0.70.0"]
 runpod = ["runpod>=1.7.0"]
 voice = [
-    "voicequant[stt]",
+    "voicequant[stt,tts]",
 ]
 all = [
-    "voicequant[serve,bench,stt,modal]",
+    "voicequant[serve,bench,stt,tts,modal]",
 ]
 
 [project.scripts]
