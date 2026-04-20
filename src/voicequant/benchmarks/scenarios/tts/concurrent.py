@@ -15,7 +15,7 @@ from typing import Any
 
 from voicequant.server.config import GPU_CAPACITY_ESTIMATES
 
-_MODELS = [
+_MODELS: list[dict[str, Any]] = [
     {"name": "kokoro", "compression": "none", "per_session_mb": 120},
     {"name": "orpheus-fp16", "compression": "fp16", "per_session_mb": 720},
     {"name": "orpheus-tq4", "compression": "tq4", "per_session_mb": 310},
