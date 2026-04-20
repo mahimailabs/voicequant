@@ -224,7 +224,7 @@ def tts_speak(
     text: str = typer.Argument(..., help="Text to synthesize. Use '-' to read stdin."),
     voice: str = typer.Option("af_heart", "--voice"),
     fmt: str = typer.Option("wav", "--format", help="wav | pcm | mp3 | opus"),
-    output: str | None = typer.Option(None, "--output", help="Output file path"),
+    output: str | None = typer.Option(None, "--output", help="Output file path (use - for stdout)"),
     device: str = typer.Option("auto", "--device", help="auto | cuda | cpu"),
 ) -> None:
     """Synthesize text to speech and write audio output."""
@@ -238,11 +238,14 @@ def tts_speak(
     result = engine.synthesize(content, voice=voice, output_format=fmt)
     elapsed_ms = (time.time() - started) * 1000
 
-    out_path = output or f"voicequant_tts.{result.format}"
-    with open(out_path, "wb") as f:
-        f.write(result.audio_bytes)
-
-    console.print(f"[green]Saved audio to:[/green] {out_path}")
+    if output == "-":
+        sys.stdout.buffer.write(result.audio_bytes)
+        out_path = "stdout"
+    else:
+        out_path = output or f"voicequant_tts.{result.format}"
+        with open(out_path, "wb") as f:
+            f.write(result.audio_bytes)
+        console.print(f"[green]Saved audio to:[/green] {out_path}")
     console.print(
         f"Voice={result.voice} | Format={result.format} | "
         f"SampleRate={result.sample_rate}Hz | Duration={result.duration_seconds:.2f}s | "
@@ -297,9 +300,11 @@ def tts_benchmark_quick(
 
     avg_latency = sum(latencies) / len(latencies) if latencies else 0.0
     avg_duration = sum(durations) / len(durations) if durations else 0.0
+    ttfa_ms = latencies[0] if latencies else 0.0
 
     console.print("[bold]Quick TTS benchmark[/bold]")
     console.print(f"Runs: {len(samples)}")
+    console.print(f"TTFA (first sample latency): {ttfa_ms:.1f} ms")
     console.print(f"Average latency: {avg_latency:.1f} ms")
     console.print(f"Average audio duration: {avg_duration:.2f} s")
 
