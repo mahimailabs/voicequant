@@ -212,5 +212,91 @@ def stt_transcribe(
         console.print_json(_json.dumps({"text": result.text}))
 
 
+tts_app = typer.Typer(help="Text-to-speech (Kokoro) commands.")
+app.add_typer(tts_app, name="tts")
+
+
+@tts_app.command("voices")
+def tts_voices() -> None:
+    """List available TTS voices."""
+    from rich.table import Table
+
+    from voicequant.core.tts.engine import KOKORO_VOICES
+
+    table = Table(title="Available TTS voices")
+    table.add_column("Voice ID", style="cyan")
+    table.add_column("Description")
+    for v in KOKORO_VOICES:
+        table.add_row(v["voice_id"], v.get("description", ""))
+    console.print(table)
+
+
+@tts_app.command("speak")
+def tts_speak(
+    text: str = typer.Argument(..., help="Text to synthesize (use '-' to read stdin)"),
+    voice: str = typer.Option("af_heart", "--voice"),
+    fmt: str = typer.Option("wav", "--format", help="wav | pcm | mp3 | opus"),
+    output: str = typer.Option(
+        None, "--output", help="Output file path (default: speech.<fmt>)"
+    ),
+    device: str = typer.Option("auto", "--device"),
+) -> None:
+    """Synthesize speech from text and write it to a file."""
+    import sys
+
+    from voicequant.core.tts.config import TTSConfig
+    from voicequant.core.tts.engine import TTSEngine
+
+    if text == "-":
+        text = sys.stdin.read()
+
+    cfg = TTSConfig(device=device, default_voice=voice, output_format=fmt)
+    engine = TTSEngine(cfg)
+    result = engine.synthesize(text, voice=voice, output_format=fmt)
+
+    out_path = output or f"speech.{result.format}"
+    with open(out_path, "wb") as f:
+        f.write(result.audio_bytes)
+
+    console.print(f"[green]Wrote {len(result.audio_bytes)} bytes -> {out_path}[/green]")
+    console.print(
+        f"voice={result.voice} format={result.format} "
+        f"sample_rate={result.sample_rate} duration={result.duration_seconds:.2f}s"
+    )
+
+
+@tts_app.command("benchmark-quick")
+def tts_benchmark_quick(
+    voice: str = typer.Option("af_heart", "--voice"),
+    device: str = typer.Option("auto", "--device"),
+) -> None:
+    """Quick sanity-check benchmark for TTS."""
+    import time
+
+    from voicequant.core.tts.config import TTSConfig
+    from voicequant.core.tts.engine import TTSEngine
+
+    sentences = [
+        "Hello, this is a TTS latency test.",
+        "The quick brown fox jumps over the lazy dog.",
+        "VoiceQuant makes voice AI faster.",
+    ]
+
+    cfg = TTSConfig(device=device, default_voice=voice)
+    engine = TTSEngine(cfg)
+
+    latencies = []
+    for s in sentences:
+        t0 = time.time()
+        engine.synthesize(s, voice=voice)
+        latencies.append((time.time() - t0) * 1000)
+
+    avg = sum(latencies) / len(latencies)
+    console.print(
+        f"[green]avg latency={avg:.1f}ms "
+        f"min={min(latencies):.1f}ms max={max(latencies):.1f}ms[/green]"
+    )
+
+
 if __name__ == "__main__":
     app()

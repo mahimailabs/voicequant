@@ -38,13 +38,12 @@ Persona:
 
 from __future__ import annotations
 
+import logging
 import os
 
-from livekit.agents import AgentSession, Agent, RoomInputOptions
-from livekit.agents.llm import ChatContext
+from livekit.agents import Agent, AgentSession, RoomInputOptions
 from livekit.agents.voice import MetricsCollectedEvent
-from livekit.plugins import deepgram, cartesia, openai
-import logging
+from livekit.plugins import cartesia, deepgram, openai
 
 logger = logging.getLogger("voicequant-agent")
 logger.setLevel(logging.INFO)

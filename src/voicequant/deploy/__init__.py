@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+
 from rich.console import Console
 
 console = Console()
@@ -39,7 +40,7 @@ def _generate_modal(model: str, gpu: str, output_path: Path) -> None:
     shutil.copy2(src, dst)
     console.print(f"[green]Modal deployment script written to {dst}[/green]")
     console.print(f"\nTo deploy:\n  modal deploy {dst}")
-    console.print(f"\nEnvironment variables:")
+    console.print("\nEnvironment variables:")
     console.print(f"  VOICEQUANT_MODEL={model}")
     console.print(f"  VOICEQUANT_GPU={gpu}")
 
@@ -51,7 +52,7 @@ def _generate_runpod(model: str, gpu: str, output_path: Path) -> None:
     dst = output_path / "runpod_handler.py"
     shutil.copy2(src, dst)
     console.print(f"[green]RunPod handler written to {dst}[/green]")
-    console.print(f"\nUpload to RunPod serverless with:")
+    console.print("\nUpload to RunPod serverless with:")
     console.print(f"  Model: {model}")
     console.print(f"  GPU: {gpu}")
 
@@ -64,8 +65,8 @@ def _generate_docker(model: str, gpu: str, output_path: Path) -> None:
         dst = output_path / fname
         shutil.copy2(src, dst)
         console.print(f"[green]{fname} written to {dst}[/green]")
-    console.print(f"\nTo build and run:")
-    console.print(f"  docker compose up --build")
-    console.print(f"\nEnvironment variables:")
+    console.print("\nTo build and run:")
+    console.print("  docker compose up --build")
+    console.print("\nEnvironment variables:")
     console.print(f"  VOICEQUANT_MODEL={model}")
     console.print(f"  VOICEQUANT_GPU={gpu}")

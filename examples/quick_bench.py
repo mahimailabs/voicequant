@@ -39,9 +39,9 @@ from dataclasses import dataclass, field
 
 import httpx
 from rich.console import Console
-from rich.table import Table
-from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.table import Table
 from rich.text import Text
 
 console = Console()

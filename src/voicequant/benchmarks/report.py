@@ -193,7 +193,7 @@ def _generate_ttfb_section(result: dict[str, Any]) -> str:
     ]
 
     results_list = result.get("results", [])
-    ctx_lengths = sorted(set(r["context_length"] for r in results_list))
+    ctx_lengths = sorted({r["context_length"] for r in results_list})
 
     for ctx in ctx_lengths:
         ctx_results = {
