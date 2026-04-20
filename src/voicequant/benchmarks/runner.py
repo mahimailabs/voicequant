@@ -176,7 +176,7 @@ def _print_detailed_results(scenario_name: str, result: dict[str, Any]) -> None:
         table.add_column("TQ3 (ms)", justify="right")
         table.add_column("TQ4 Speedup", justify="right")
 
-        ctx_lengths = sorted(set(r["context_length"] for r in results))
+        ctx_lengths = sorted({r["context_length"] for r in results})
         for ctx in ctx_lengths:
             ctx_results = {
                 r["kv_dtype"]: r for r in results if r["context_length"] == ctx

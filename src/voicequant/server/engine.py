@@ -231,7 +231,9 @@ class VoiceQuantEngine:
 
             if torch.cuda.is_available():
                 mem_allocated = torch.cuda.memory_allocated() / (1024**3)
-                mem_total = torch.cuda.get_device_properties(0).total_mem / (1024**3)
+                mem_total = torch.cuda.get_device_properties(0).total_memory / (
+                    1024**3
+                )
                 health["gpu"] = {
                     "name": torch.cuda.get_device_name(),
                     "memory_allocated_gb": round(mem_allocated, 2),

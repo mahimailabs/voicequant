@@ -125,8 +125,8 @@ async def entrypoint(session) -> None:
     No special client configuration is needed beyond pointing to the
     gateway URL.
     """
-    from livekit.agents import AgentSession, Agent, RoomInputOptions
-    from livekit.plugins import deepgram, cartesia, openai
+    from livekit.agents import Agent, RoomInputOptions
+    from livekit.plugins import cartesia, deepgram, openai
 
     # The gateway URL — agents connect here instead of directly to VoiceQuant.
     # The gateway handles routing, load balancing, and health checks.

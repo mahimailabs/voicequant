@@ -39,7 +39,6 @@ import os
 import sys
 
 from loguru import logger
-
 from pipecat.frames.frames import EndFrame, LLMMessagesFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner

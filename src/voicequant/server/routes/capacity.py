@@ -28,7 +28,7 @@ def build_router(config, get_engine, metrics_registry) -> APIRouter:
             if torch.cuda.is_available():
                 gpu_name = torch.cuda.get_device_name()
                 mem_free = (
-                    torch.cuda.get_device_properties(0).total_mem
+                    torch.cuda.get_device_properties(0).total_memory
                     - torch.cuda.memory_allocated()
                 ) / (1024**3)
                 tq4_sessions = int(mem_free * 1024 / 30)

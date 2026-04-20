@@ -155,7 +155,7 @@ class TTFBBenchmark:
                 temperature=0.0,
                 stream=True,
             )
-            for chunk in stream:
+            for _chunk in stream:
                 pass
 
         # Measurement runs
@@ -179,7 +179,7 @@ class TTFBBenchmark:
                     break
 
             # Drain remaining
-            for chunk in stream:
+            for _chunk in stream:
                 pass
 
             ttfb = ((first_token_time or time.perf_counter()) - t0) * 1000.0
@@ -261,7 +261,7 @@ class TTFBBenchmark:
                     "good": "blue",
                     "poor": "yellow",
                     "unusable": "red",
-                }.get(result["grade"], "white")
+                }.get(str(result["grade"]), "white")
                 console.print(
                     f"  {kv_dtype:5s} | TTFB={result['ttfb_ms']:7.1f}ms | "
                     f"[{grade_color}]{result['grade']}[/{grade_color}]"

@@ -33,7 +33,7 @@ except ImportError:
     _HAS_OPENAI = False
 
 try:
-    import torch
+    import torch  # noqa: F401
 
     _HAS_TORCH = True
 except ImportError:
@@ -312,7 +312,6 @@ class QualityBenchmark:
                 "[yellow]No live server detected -- using simulated results.[/yellow]"
             )
 
-        kv_dtypes = ["fp16", "tq4", "tq3"]
         n_prompts = len(VOICE_PROMPTS)
         prompt_results: list[dict[str, Any]] = []
 

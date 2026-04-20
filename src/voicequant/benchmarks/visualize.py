@@ -41,12 +41,12 @@ def _require_matplotlib():
         import matplotlib.pyplot as plt
 
         return plt
-    except ImportError:
+    except ImportError as e:
         console.print(
             "[red]matplotlib is required for charts. "
             "Install it with: pip install voicequant[viz][/red]"
         )
-        raise SystemExit(1)
+        raise SystemExit(1) from e
 
 
 def _compute_analytical_data() -> dict[str, Any]:
@@ -229,7 +229,7 @@ def _chart_concurrent_sessions_by_gpu(
         alpha=0.85,
     )
 
-    for bar_fp, bar_tq, gpu in zip(bars_fp16, bars_tq4, gpus, strict=False):
+    for bar_fp, bar_tq, _gpu in zip(bars_fp16, bars_tq4, gpus, strict=False):
         multiplier = bar_tq.get_width() / max(bar_fp.get_width(), 1)
         ax.text(
             bar_tq.get_width() + 3,
@@ -349,7 +349,7 @@ def _chart_compression_ratio(
         )
 
     # Add compression ratio annotations on TQ4 bars
-    for j, ctx_label in enumerate(ctx_labels):
+    for j, _ctx_label in enumerate(ctx_labels):
         ratio = data["ratio_data"]["tq4"][j]
         tq4_val = data["memory_data"]["tq4"][j]
         ax.text(
@@ -485,7 +485,7 @@ def _chart_concurrent_scaling(
                     xytext=(sessions[i] + 3, ttfb + 30),
                     fontsize=9,
                     color=COLORS[key],
-                    arrowprops=dict(arrowstyle="->", color=COLORS[key]),
+                    arrowprops={"arrowstyle": "->", "color": COLORS[key]},
                 )
                 break
 
