@@ -8,13 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from voicequant.core.protocol import CapacityReport, HealthStatus
-from voicequant.core.tts.audio import (
-    float32_to_pcm,
-    float32_to_wav,
-    get_audio_duration,
-    wav_to_mp3,
-    wav_to_opus,
-)
+from voicequant.core.tts.audio import float32_to_pcm, float32_to_wav, get_audio_duration, wav_to_mp3
 from voicequant.core.tts.config import TTSConfig
 from voicequant.core.tts.speaker_cache import SpeakerCache
 
@@ -47,8 +41,8 @@ class TTSEngine:
         self._model_loaded = False
         self._speaker_cache: SpeakerCache | None = None
         self._load_lock = threading.Lock()
-        self._active = 0
         self._active_lock = threading.Lock()
+        self._active = 0
         self._syntheses_total = 0
         self._latency_sum_ms = 0.0
         self._start_time = time.time()
@@ -67,10 +61,7 @@ class TTSEngine:
             if model_cls is None:
                 raise ImportError("kokoro_onnx does not expose a Kokoro model class")
 
-            kwargs = {"device": self.config.device}
-            if self.config.model_path:
-                kwargs["model_path"] = self.config.model_path
-            self._model = model_cls(**kwargs)
+            self._model = model_cls(self.config.model_path, self.config.voices_path)
             self._speaker_cache = SpeakerCache(self.config.speaker_cache_size)
             self._model_loaded = True
 
@@ -82,40 +73,41 @@ class TTSEngine:
         with self._active_lock:
             self._active = max(0, self._active - 1)
 
-    def _get_or_create_speaker_embedding(self, voice: str) -> Any:
+    def _record_synthesis(self, elapsed_ms: float) -> None:
+        with self._active_lock:
+            self._latency_sum_ms += elapsed_ms
+            self._syntheses_total += 1
+
+    def _voice_payload(self, voice: str):
         if self._speaker_cache is None:
             self._speaker_cache = SpeakerCache(self.config.speaker_cache_size)
-
         cached = self._speaker_cache.get(voice)
         if cached is not None:
             return cached
+        self._speaker_cache.put(voice, voice)
+        return voice
 
-        embedding: Any = voice
-        if hasattr(self._model, "get_speaker_embedding"):
-            embedding = self._model.get_speaker_embedding(voice)
-        elif hasattr(self._model, "load_voice"):
-            embedding = self._model.load_voice(voice)
-
-        self._speaker_cache.put(voice, embedding)
-        return embedding
-
-    def _synthesize_samples(self, text: str, voice: str, speaker_embedding: Any):
-        if hasattr(self._model, "synthesize"):
-            out = self._model.synthesize(text=text, voice=voice, speaker=speaker_embedding)
-        elif hasattr(self._model, "generate"):
-            out = self._model.generate(text=text, voice=voice, speaker=speaker_embedding)
-        elif callable(self._model):
-            out = self._model(text=text, voice=voice, speaker=speaker_embedding)
+    def _synthesize_samples(self, text: str, voice_payload: Any):
+        if hasattr(self._model, "create"):
+            out = self._model.create(text, voice_payload)
         else:
-            raise RuntimeError("Unsupported kokoro_onnx model interface")
+            raise RuntimeError("Unsupported kokoro_onnx model interface: missing create()")
+
+        sample_rate = self.config.sample_rate
+        samples = None
 
         if isinstance(out, dict):
-            samples = out.get("audio") or out.get("samples") or out.get("waveform")
+            if "audio" in out and out["audio"] is not None:
+                samples = out["audio"]
+            elif "samples" in out and out["samples"] is not None:
+                samples = out["samples"]
+            elif "waveform" in out and out["waveform"] is not None:
+                samples = out["waveform"]
             sample_rate = int(out.get("sample_rate", self.config.sample_rate))
         elif isinstance(out, tuple) and len(out) >= 2:
             samples, sample_rate = out[0], int(out[1])
         else:
-            samples, sample_rate = out, self.config.sample_rate
+            samples = out
 
         if samples is None:
             raise RuntimeError("TTS backend returned no samples")
@@ -131,10 +123,14 @@ class TTSEngine:
         if fmt == "mp3":
             wav = float32_to_wav(samples, sample_rate)
             return wav_to_mp3(wav)
-        if fmt == "opus":
-            wav = float32_to_wav(samples, sample_rate)
-            return wav_to_opus(wav)
         raise ValueError(f"Unsupported response format: {output_format}")
+
+    @staticmethod
+    def _duration_from_samples(samples, sample_rate: int) -> float:
+        try:
+            return len(samples) / sample_rate if sample_rate else 0.0
+        except TypeError:
+            return 0.0
 
     def synthesize(
         self,
@@ -157,30 +153,30 @@ class TTSEngine:
         self._incr_active()
         t0 = time.time()
         try:
-            speaker_embedding = self._get_or_create_speaker_embedding(selected_voice)
-            samples, sample_rate = self._synthesize_samples(
-                text=text,
-                voice=selected_voice,
-                speaker_embedding=speaker_embedding,
-            )
+            voice_payload = self._voice_payload(selected_voice)
+            samples, sample_rate = self._synthesize_samples(text=text, voice_payload=voice_payload)
+            precomputed_duration = self._duration_from_samples(samples, sample_rate)
             audio_bytes = self._encode_audio(samples, sample_rate, selected_format)
-            duration = get_audio_duration(audio_bytes, selected_format, sample_rate)
+            if selected_format in {"wav", "pcm"}:
+                duration_seconds = get_audio_duration(audio_bytes, selected_format, sample_rate)
+            else:
+                duration_seconds = precomputed_duration
+
             return SynthesisResult(
                 audio_bytes=audio_bytes,
                 sample_rate=sample_rate,
-                duration_seconds=duration,
+                duration_seconds=duration_seconds,
                 format=selected_format,
                 voice=selected_voice,
             )
         finally:
             elapsed_ms = (time.time() - t0) * 1000
-            self._latency_sum_ms += elapsed_ms
-            self._syntheses_total += 1
+            self._record_synthesis(elapsed_ms)
             self._decr_active()
 
     def list_voices(self) -> list[str]:
-        if self._model_loaded and hasattr(self._model, "list_voices"):
-            voices = self._model.list_voices()
+        if self._model_loaded and hasattr(self._model, "get_voices"):
+            voices = self._model.get_voices()
             if isinstance(voices, list):
                 return [str(v) for v in voices]
         return DEFAULT_KOKORO_VOICES
@@ -193,14 +189,13 @@ class TTSEngine:
         )
 
     def capacity(self) -> CapacityReport:
-        active = self._active
+        with self._active_lock:
+            active = self._active
+            syntheses_total = self._syntheses_total
+            latency_sum_ms = self._latency_sum_ms
         headroom = max(0, self.config.max_concurrent - active)
         saturated = active >= self.config.max_concurrent
-        avg_ms = (
-            self._latency_sum_ms / self._syntheses_total
-            if self._syntheses_total > 0
-            else 0.0
-        )
+        avg_ms = latency_sum_ms / syntheses_total if syntheses_total > 0 else 0.0
         return CapacityReport(
             active=active,
             headroom=headroom,
@@ -209,16 +204,16 @@ class TTSEngine:
         )
 
     def metrics(self) -> dict[str, float]:
-        avg_ms = (
-            self._latency_sum_ms / self._syntheses_total
-            if self._syntheses_total > 0
-            else 0.0
-        )
+        with self._active_lock:
+            active = self._active
+            syntheses_total = self._syntheses_total
+            latency_sum_ms = self._latency_sum_ms
+        avg_ms = latency_sum_ms / syntheses_total if syntheses_total > 0 else 0.0
         cache_stats = self._speaker_cache.stats() if self._speaker_cache else {}
         return {
-            "syntheses_total": float(self._syntheses_total),
+            "syntheses_total": float(syntheses_total),
             "avg_latency_ms": float(avg_ms),
-            "active_sessions": float(self._active),
+            "active_sessions": float(active),
             "model_loaded": float(1 if self._model_loaded else 0),
             "speaker_cache_hit_rate": float(cache_stats.get("hit_rate", 0.0)),
             "speaker_cache_size": float(cache_stats.get("size", 0)),

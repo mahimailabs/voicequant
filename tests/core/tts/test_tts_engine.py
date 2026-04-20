@@ -9,16 +9,17 @@ from voicequant.core.tts.engine import SynthesisResult, TTSEngine
 
 
 class _MockKokoro:
-    def __init__(self, **kwargs):
-        self.kwargs = kwargs
+    def __init__(self, model_path=None, voices_path=None):
+        self.model_path = model_path
+        self.voices_path = voices_path
         self.calls = []
 
-    def get_speaker_embedding(self, voice):
-        return f"embed:{voice}"
-
-    def synthesize(self, text, voice, speaker):
-        self.calls.append((text, voice, speaker))
+    def create(self, text, voice):
+        self.calls.append((text, voice))
         return {"audio": [0.0, 0.1, -0.1, 0.0], "sample_rate": 24000}
+
+    def get_voices(self):
+        return ["af_heart", "bf_ember"]
 
 
 
@@ -63,7 +64,6 @@ def test_speaker_cache_used_across_syntheses(monkeypatch):
 
     e = TTSEngine(TTSConfig(device="cpu"))
     e.synthesize("hello", voice="af_heart")
-    first = e.metrics()
     e.synthesize("again", voice="af_heart")
     second = e.metrics()
-    assert second["speaker_cache_hit_rate"] >= first["speaker_cache_hit_rate"]
+    assert second["speaker_cache_hit_rate"] == 0.5

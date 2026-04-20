@@ -223,7 +223,7 @@ app.add_typer(tts_app, name="tts")
 def tts_speak(
     text: str = typer.Argument(..., help="Text to synthesize. Use '-' to read stdin."),
     voice: str = typer.Option("af_heart", "--voice"),
-    fmt: str = typer.Option("wav", "--format", help="wav | pcm | mp3 | opus"),
+    fmt: str = typer.Option("wav", "--format", help="wav | pcm | mp3"),
     output: str | None = typer.Option(None, "--output", help="Output file path (use - for stdout)"),
     device: str = typer.Option("auto", "--device", help="auto | cuda | cpu"),
 ) -> None:
@@ -234,9 +234,13 @@ def tts_speak(
     content = sys.stdin.read() if text == "-" else text
     cfg = TTSConfig(device=device, default_voice=voice, output_format=fmt)
     engine = TTSEngine(cfg)
-    started = time.time()
-    result = engine.synthesize(content, voice=voice, output_format=fmt)
-    elapsed_ms = (time.time() - started) * 1000
+    try:
+        started = time.time()
+        result = engine.synthesize(content, voice=voice, output_format=fmt)
+        elapsed_ms = (time.time() - started) * 1000
+    except (ImportError, ValueError, RuntimeError) as e:
+        console.print(f"[red]TTS synthesis failed:[/red] {e}")
+        raise typer.Exit(1) from e
 
     if output == "-":
         sys.stdout.buffer.write(result.audio_bytes)
@@ -290,6 +294,9 @@ def tts_benchmark_quick(
     ]
 
     engine = TTSEngine(TTSConfig(device=device, default_voice=voice))
+    # Warm-up to avoid lazy model-load skew in measured averages.
+    engine.synthesize(samples[0], voice=voice)
+
     latencies: list[float] = []
     durations: list[float] = []
     for text in samples:

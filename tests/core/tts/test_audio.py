@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import importlib.util
+
 import pytest
 
 from voicequant.core.tts.audio import (
@@ -30,11 +32,27 @@ def test_get_audio_duration_pcm():
     assert dur == pytest.approx(1.0, rel=1e-3)
 
 
-def test_wav_to_mp3_importerror_message():
+def test_wav_to_mp3_importerror_message(monkeypatch):
+    original = importlib.util.find_spec
+
+    def fake_find_spec(name, package=None):
+        if name == "lameenc":
+            return None
+        return original(name, package)
+
+    monkeypatch.setattr(importlib.util, "find_spec", fake_find_spec)
     with pytest.raises(ImportError, match="mp3 encoding requires lameenc"):
         wav_to_mp3(b"not-a-real-wav")
 
 
-def test_wav_to_opus_importerror_message():
+def test_wav_to_opus_importerror_message(monkeypatch):
+    original = importlib.util.find_spec
+
+    def fake_find_spec(name, package=None):
+        if name == "opuslib":
+            return None
+        return original(name, package)
+
+    monkeypatch.setattr(importlib.util, "find_spec", fake_find_spec)
     with pytest.raises(ImportError, match="opus encoding requires opuslib"):
         wav_to_opus(b"not-a-real-wav")

@@ -24,7 +24,6 @@ def __getattr__(name: str):
         "float32_to_wav",
         "float32_to_pcm",
         "wav_to_mp3",
-        "wav_to_opus",
         "get_audio_duration",
     }:
         from voicequant.core.tts import audio as _audio
@@ -41,6 +40,5 @@ __all__ = [
     "float32_to_wav",
     "float32_to_pcm",
     "wav_to_mp3",
-    "wav_to_opus",
     "get_audio_duration",
 ]

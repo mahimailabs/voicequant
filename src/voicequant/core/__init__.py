@@ -3,17 +3,26 @@
 from __future__ import annotations
 
 import importlib as _importlib
+import logging
 import sys as _sys
+
+_logger = logging.getLogger(__name__)
+_OPTIONAL_HEAVY_DEPS = {"torch", "scipy"}
 
 for _name in ("engine", "codebook", "config", "constants", "wrapper", "validator"):
     try:
         _sys.modules[f"voicequant.core.{_name}"] = _importlib.import_module(
             f"voicequant.core.llm.{_name}"
         )
-    except ImportError:
-        # Keep package importable in minimal environments where optional
-        # heavy deps (torch/scipy) are not installed yet.
-        pass
+    except ModuleNotFoundError as exc:
+        if exc.name in _OPTIONAL_HEAVY_DEPS:
+            _logger.debug(
+                "Skipping optional core alias voicequant.core.%s due to missing dependency: %s",
+                _name,
+                exc,
+            )
+            continue
+        raise
 
 
 def __getattr__(name: str):

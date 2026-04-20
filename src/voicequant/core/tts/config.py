@@ -10,6 +10,7 @@ class TTSConfig(BaseModel):
 
     model_name: str = Field(default="kokoro")
     model_path: str | None = Field(default=None)
+    voices_path: str | None = Field(default=None)
     device: str = Field(default="auto")
     default_voice: str = Field(default="af_heart")
     sample_rate: int = Field(default=24000, ge=8000, le=96000)
@@ -36,6 +37,6 @@ class TTSConfig(BaseModel):
     @classmethod
     def _validate_output_format(cls, value: str) -> str:
         fmt = value.lower()
-        if fmt not in {"wav", "pcm", "mp3", "opus"}:
-            raise ValueError("output_format must be one of: wav, pcm, mp3, opus")
+        if fmt not in {"wav", "pcm", "mp3"}:
+            raise ValueError("output_format must be one of: wav, pcm, mp3")
         return fmt
