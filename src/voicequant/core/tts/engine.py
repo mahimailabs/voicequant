@@ -49,14 +49,24 @@ KOKORO_VOICES: list[dict[str, str]] = [
 ]
 
 
+def _detect_backend(model_name: str) -> str:
+    """Return 'orpheus' or 'kokoro' based on the model name."""
+    name = (model_name or "").lower()
+    if "orpheus" in name or "canopylabs" in name:
+        return "orpheus"
+    return "kokoro"
+
+
 class TTSEngine:
     """kokoro-onnx-backed TTS engine with lazy model loading."""
 
     def __init__(self, config: TTSConfig | None = None) -> None:
         self.config = config or TTSConfig()
+        self._backend = _detect_backend(self.config.model_name)
         self._model: Any = None
         self._model_loaded = False
         self._speaker_cache: SpeakerCache | None = None
+        self._orpheus: Any = None
         self._lock = threading.Lock()
         self._active = 0
         self._active_lock = threading.Lock()
@@ -64,23 +74,84 @@ class TTSEngine:
         self._latency_sum_ms = 0.0
         self._start_time = time.time()
 
+    @property
+    def backend(self) -> str:
+        return self._backend
+
     def load_model(self) -> None:
         with self._lock:
             if self._model_loaded:
                 return
-            from kokoro_onnx import Kokoro
-
-            if self.config.model_path:
-                self._model = Kokoro(self.config.model_path)
+            if self._backend == "orpheus":
+                self._load_orpheus()
             else:
-                # Let kokoro-onnx resolve its default model.
-                self._model = Kokoro()
+                self._load_kokoro()
             self._speaker_cache = SpeakerCache(self.config.speaker_cache_size)
             self._model_loaded = True
 
+    def _load_kokoro(self) -> None:
+        from kokoro_onnx import Kokoro
+
+        if self.config.model_path:
+            self._model = Kokoro(self.config.model_path)
+        else:
+            self._model = Kokoro()
+
+    def _load_orpheus(self) -> None:
+        try:
+            from voicequant.core.tts.orpheus_adapter import (
+                OrpheusAdapter,
+                OrpheusConfig,
+            )
+        except ImportError as e:
+            raise ImportError(
+                "Orpheus backend module failed to import. "
+                "Install with: pip install voicequant[tts-orpheus]"
+            ) from e
+
+        self._orpheus = OrpheusAdapter(
+            OrpheusConfig(
+                model_name=self.config.model_name,
+                device=self.config.device,
+                tq_bits=self.config.tq_bits,
+                tq_enabled=self.config.tq_enabled,
+                sample_rate=self.config.sample_rate,
+            )
+        )
+        self._orpheus.load_model()
+        self._model = self._orpheus
+
     def list_voices(self) -> list[dict[str, str]]:
-        """Return available voice identifiers (static Kokoro list)."""
+        """Return available voice identifiers for the active backend."""
+        if self._backend == "orpheus" and self._orpheus is not None:
+            return self._orpheus.list_voices()
         return list(KOKORO_VOICES)
+
+    @property
+    def sample_rate(self) -> int:
+        return int(self.config.sample_rate)
+
+    def get_compression_stats(self) -> dict[str, Any] | None:
+        """Return KV compression metrics for Orpheus, None for Kokoro."""
+        if self._backend != "orpheus":
+            return None
+        if self._orpheus is None:
+            return None
+        return self._orpheus.get_compression_stats()
+
+    def stream_samples(self, text: str, voice: str | None = None):
+        """Yield native float32 sample arrays when the backend supports it."""
+        if not self._model_loaded:
+            self.load_model()
+        if self._backend == "orpheus" and self._orpheus is not None:
+            yield from self._orpheus.stream_samples(text, voice=voice)
+            return
+        # Kokoro does not stream natively; fall back to one-shot synthesize.
+        result = self.synthesize(text, voice=voice, output_format="pcm")
+        import numpy as np
+
+        pcm = np.frombuffer(result.audio_bytes, dtype=np.int16)
+        yield pcm.astype(np.float32) / 32767.0
 
     def _incr_active(self) -> None:
         with self._active_lock:
@@ -138,25 +209,40 @@ class TTSEngine:
         self._incr_active()
         t0 = time.time()
         try:
-            embedding = self._get_voice_embedding(voice_id)
-            samples, sample_rate = self._model.create(
-                text,
-                voice=embedding,
-                speed=1.0,
-                lang="en-us",
-            )
+            if self._backend == "orpheus" and self._orpheus is not None:
+                result = self._orpheus.synthesize(
+                    text, voice=voice_id, output_format=fmt
+                )
+                if not result.voice:
+                    result = SynthesisResult(
+                        audio_bytes=result.audio_bytes,
+                        sample_rate=result.sample_rate,
+                        duration_seconds=result.duration_seconds,
+                        format=result.format,
+                        voice=voice_id,
+                    )
+            else:
+                embedding = self._get_voice_embedding(voice_id)
+                samples, sample_rate = self._model.create(
+                    text,
+                    voice=embedding,
+                    speed=1.0,
+                    lang="en-us",
+                )
 
-            audio_bytes, resolved_fmt = self._encode_audio(
-                samples, int(sample_rate), fmt
-            )
-            duration = get_audio_duration(audio_bytes, resolved_fmt, int(sample_rate))
-            result = SynthesisResult(
-                audio_bytes=audio_bytes,
-                sample_rate=int(sample_rate),
-                duration_seconds=duration,
-                format=resolved_fmt,
-                voice=voice_id,
-            )
+                audio_bytes, resolved_fmt = self._encode_audio(
+                    samples, int(sample_rate), fmt
+                )
+                duration = get_audio_duration(
+                    audio_bytes, resolved_fmt, int(sample_rate)
+                )
+                result = SynthesisResult(
+                    audio_bytes=audio_bytes,
+                    sample_rate=int(sample_rate),
+                    duration_seconds=duration,
+                    format=resolved_fmt,
+                    voice=voice_id,
+                )
         finally:
             elapsed_ms = (time.time() - t0) * 1000
             self._latency_sum_ms += elapsed_ms

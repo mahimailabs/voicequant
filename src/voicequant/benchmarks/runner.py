@@ -60,6 +60,27 @@ def _load_scenarios() -> None:
             "ToolCallingBenchmark",
         ),
         "quality": ("voicequant.benchmarks.scenarios.quality", "QualityBenchmark"),
+        # TTS scenarios (M5)
+        "tts_ttfa": (
+            "voicequant.benchmarks.scenarios.tts.ttfa",
+            "TTFAScenario",
+        ),
+        "tts_streaming_jitter": (
+            "voicequant.benchmarks.scenarios.tts.streaming_jitter",
+            "StreamingJitterScenario",
+        ),
+        "tts_mos_quality": (
+            "voicequant.benchmarks.scenarios.tts.mos_quality",
+            "MOSQualityScenario",
+        ),
+        "tts_concurrent": (
+            "voicequant.benchmarks.scenarios.tts.concurrent",
+            "ConcurrentTTSScenario",
+        ),
+        "tts_speaker_cache_hit": (
+            "voicequant.benchmarks.scenarios.tts.speaker_cache_hit",
+            "SpeakerCacheHitScenario",
+        ),
     }
 
     for name, (module_path, class_name) in scenario_imports.items():

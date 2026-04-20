@@ -1,0 +1,23 @@
+{
+  "short": [
+    {"text": "Hello, how can I help you today?", "expected_duration_range": [1.2, 2.0]},
+    {"text": "Let me check that for you.", "expected_duration_range": [1.0, 1.8]},
+    {"text": "Got it, thanks.", "expected_duration_range": [0.7, 1.3]},
+    {"text": "Sure, happy to help.", "expected_duration_range": [0.9, 1.5]},
+    {"text": "One moment please.", "expected_duration_range": [0.8, 1.4]}
+  ],
+  "medium": [
+    {"text": "I can look up your account status and show the most recent transactions from the last month.", "expected_duration_range": [4.5, 6.5]},
+    {"text": "Your appointment is confirmed for tomorrow afternoon at three pm in the downtown office.", "expected_duration_range": [4.0, 6.0]},
+    {"text": "The weather forecast for today shows partly cloudy skies with a high near seventy two degrees.", "expected_duration_range": [4.5, 6.5]},
+    {"text": "To reset your password, go to the account settings page and select change password from the menu.", "expected_duration_range": [4.5, 6.5]},
+    {"text": "I found three restaurants nearby that match your preferences and have tables available right now.", "expected_duration_range": [4.5, 6.5]}
+  ],
+  "long": [
+    {"text": "Thanks for calling. Before I transfer you, I want to make sure I have the right details. Could you confirm your account number and the best email address we have on file, so the specialist can pick up exactly where we left off?", "expected_duration_range": [11.0, 16.0]},
+    {"text": "Based on the ticket you filed last week, the team shipped a fix this morning that resolves the login loop on mobile. You should be able to sign in normally now, though you may need to restart the app once for the update to take effect.", "expected_duration_range": [11.0, 16.0]},
+    {"text": "Here is a summary of what we just discussed. I will schedule the follow up call for next Tuesday morning, email you the recording of this session, and forward the billing question to the finance team so they can reach out directly.", "expected_duration_range": [11.0, 16.0]},
+    {"text": "You have two upgrade paths available. The standard plan adds unlimited transcription and priority support for a modest monthly fee. The premium plan includes those plus a dedicated account manager and a quarterly review of your usage metrics.", "expected_duration_range": [11.0, 16.0]},
+    {"text": "The policy you referenced covers device replacement within the first year of purchase. Since your device is eight months old, you qualify for a free replacement. I will start that process now and email the shipping label within the next hour.", "expected_duration_range": [11.0, 16.0]}
+  ]
+}

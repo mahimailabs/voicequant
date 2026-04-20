@@ -41,6 +41,24 @@ def serve(
     )
 
 
+_LLM_SCENARIOS = [
+    "multi_turn",
+    "concurrent",
+    "ttfb",
+    "system_prompt",
+    "tool_calling",
+    "quality",
+]
+
+_TTS_SCENARIOS = [
+    "tts_ttfa",
+    "tts_streaming_jitter",
+    "tts_mos_quality",
+    "tts_concurrent",
+    "tts_speaker_cache_hit",
+]
+
+
 @app.command()
 def bench(
     model: str = typer.Option(
@@ -48,10 +66,15 @@ def bench(
     ),
     scenario: str = typer.Option(
         None,
-        help="Specific scenario: multi_turn, concurrent, ttfb, system_prompt, tool_calling, quality",
+        help="Specific scenario name (see --modality to list families)",
+    ),
+    modality: str = typer.Option(
+        None,
+        "--modality",
+        help="Benchmark family: llm, tts, all",
     ),
     all_scenarios: bool = typer.Option(
-        False, "--all", help="Run all benchmark scenarios"
+        False, "--all", help="Run all benchmark scenarios (LLM + TTS)"
     ),
     compare: list[str] = typer.Option(
         None, help="Compare configurations: fp16, tq4, tq3"
@@ -70,20 +93,24 @@ def bench(
     """Run voice AI benchmarks with TurboQuant compression."""
     from voicequant.benchmarks.runner import run_benchmarks
 
-    scenarios = None
+    scenarios: list[str] | None = None
     if all_scenarios:
-        scenarios = [
-            "multi_turn",
-            "concurrent",
-            "ttfb",
-            "system_prompt",
-            "tool_calling",
-            "quality",
-        ]
+        scenarios = _LLM_SCENARIOS + _TTS_SCENARIOS
+    elif modality:
+        m = modality.lower()
+        if m == "llm":
+            scenarios = list(_LLM_SCENARIOS)
+        elif m == "tts":
+            scenarios = list(_TTS_SCENARIOS)
+        elif m == "all":
+            scenarios = _LLM_SCENARIOS + _TTS_SCENARIOS
+        else:
+            console.print(f"[red]Unknown modality: {modality}[/red]")
+            raise typer.Exit(1)
     elif scenario:
         scenarios = [scenario]
     else:
-        console.print("[red]Specify --scenario or --all[/red]")
+        console.print("[red]Specify --scenario, --modality, or --all[/red]")
         raise typer.Exit(1)
 
     run_benchmarks(
@@ -95,9 +122,10 @@ def bench(
     )
 
     if viz:
-        from voicequant.benchmarks.visualize import generate_analytical_charts
+        from voicequant.benchmarks.visualize import generate_charts_by_modality
 
-        generate_analytical_charts(output_dir=chart_output)
+        viz_mod = "all" if all_scenarios else (modality or "llm")
+        generate_charts_by_modality(modality=viz_mod, output_dir=chart_output)
 
 
 @app.command()
@@ -118,11 +146,22 @@ def verify(
 def visualize(
     output: str = typer.Option("./charts", help="Output directory for charts"),
     fmt: str = typer.Option("png", "--format", help="Output format: png, svg, html"),
+    modality: str = typer.Option(
+        "llm",
+        "--modality",
+        help="Chart family: llm, tts, all (all includes cross-modality hero)",
+    ),
+    all_charts: bool = typer.Option(
+        False,
+        "--all",
+        help="Generate all chart families (LLM + TTS + cross-modality hero)",
+    ),
 ) -> None:
     """Generate FP16 vs TurboQuant efficiency comparison charts (no GPU needed)."""
-    from voicequant.benchmarks.visualize import generate_analytical_charts
+    from voicequant.benchmarks.visualize import generate_charts_by_modality
 
-    generate_analytical_charts(output_dir=output, fmt=fmt)
+    chosen = "all" if all_charts else modality
+    generate_charts_by_modality(modality=chosen, output_dir=output, fmt=fmt)
 
 
 @app.command()
@@ -240,6 +279,12 @@ def tts_speak(
         None, "--output", help="Output file path (default: speech.<fmt>)"
     ),
     device: str = typer.Option("auto", "--device"),
+    model: str = typer.Option(
+        "kokoro",
+        "--model",
+        help="Backend: kokoro | orpheus | <huggingface-id>",
+    ),
+    tq_bits: int = typer.Option(4, "--tq-bits", help="Orpheus KV bits (3 or 4)"),
 ) -> None:
     """Synthesize speech from text and write it to a file."""
     import sys
@@ -250,7 +295,13 @@ def tts_speak(
     if text == "-":
         text = sys.stdin.read()
 
-    cfg = TTSConfig(device=device, default_voice=voice, output_format=fmt)
+    cfg = TTSConfig(
+        model_name=model,
+        device=device,
+        default_voice=voice,
+        output_format=fmt,
+        tq_bits=tq_bits,
+    )
     engine = TTSEngine(cfg)
     result = engine.synthesize(text, voice=voice, output_format=fmt)
 
@@ -260,7 +311,7 @@ def tts_speak(
 
     console.print(f"[green]Wrote {len(result.audio_bytes)} bytes -> {out_path}[/green]")
     console.print(
-        f"voice={result.voice} format={result.format} "
+        f"backend={engine.backend} voice={result.voice} format={result.format} "
         f"sample_rate={result.sample_rate} duration={result.duration_seconds:.2f}s"
     )
 

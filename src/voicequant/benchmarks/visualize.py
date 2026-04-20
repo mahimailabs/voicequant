@@ -22,9 +22,25 @@ COLORS = {
     "fp16": "#e74c3c",  # red — baseline (uncompressed)
     "tq4": "#2ecc71",  # green — recommended (4-bit)
     "tq3": "#3498db",  # blue — aggressive (3-bit)
+    # TTS-specific palette
+    "kokoro": "#f39c12",  # amber/gold — non-LLM backend
+    "orpheus-fp16": "#e74c3c",  # red — baseline
+    "orpheus-tq4": "#2ecc71",  # green — compressed
+    "orpheus-tq3": "#3498db",  # blue — aggressive
+    "cloud": "#95a5a6",  # grey — external service baseline
+    "self-hosted": "#e74c3c",  # red — self-hosted FP16
+    "voicequant": "#2ecc71",  # green — VoiceQuant compressed
 }
 
-LABELS = {"fp16": "FP16", "tq4": "TQ4 (4-bit)", "tq3": "TQ3 (3-bit)"}
+LABELS = {
+    "fp16": "FP16",
+    "tq4": "TQ4 (4-bit)",
+    "tq3": "TQ3 (3-bit)",
+    "kokoro": "Kokoro",
+    "orpheus-fp16": "Orpheus FP16",
+    "orpheus-tq4": "Orpheus TQ4",
+    "orpheus-tq3": "Orpheus TQ3",
+}
 
 # Model constants for analytical calculations
 _N_LAYERS = 32
@@ -504,6 +520,454 @@ def _chart_concurrent_scaling(
     return path
 
 
+# ---------------------------------------------------------------------------
+# TTS charts (M5)
+# ---------------------------------------------------------------------------
+
+
+def _compute_tts_data() -> dict[str, Any]:
+    """Run TTS scenarios (analytically) and collect their raw results."""
+    from voicequant.benchmarks.scenarios.tts.concurrent import ConcurrentTTSScenario
+    from voicequant.benchmarks.scenarios.tts.mos_quality import MOSQualityScenario
+    from voicequant.benchmarks.scenarios.tts.speaker_cache_hit import (
+        SpeakerCacheHitScenario,
+    )
+    from voicequant.benchmarks.scenarios.tts.streaming_jitter import (
+        StreamingJitterScenario,
+    )
+    from voicequant.benchmarks.scenarios.tts.ttfa import TTFAScenario
+
+    return {
+        "ttfa": TTFAScenario().run(),
+        "jitter": StreamingJitterScenario().run(),
+        "quality": MOSQualityScenario().run(),
+        "concurrent": ConcurrentTTSScenario().run(),
+        "cache": SpeakerCacheHitScenario().run(),
+    }
+
+
+def _chart_tts_ttfa(plt, data: dict, output_dir: Path, fmt: str) -> str:
+    """TTS Chart 1: Grouped TTFA by model and text length."""
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    models = ["kokoro", "orpheus-fp16", "orpheus-tq4"]
+    lengths = ["short", "medium", "long"]
+    ttfa_rows = [r for r in data["ttfa"]["results"] if r["mode"] == "streaming"]
+
+    x_pos = range(len(lengths))
+    width = 0.25
+
+    for i, m in enumerate(models):
+        vals = []
+        for length in lengths:
+            match = next(
+                (r for r in ttfa_rows if r["model"] == m and r["text_length"] == length),
+                None,
+            )
+            vals.append(match["ttfa_ms"] if match else 0)
+        ax.bar(
+            [p + i * width for p in x_pos],
+            vals,
+            width,
+            label=LABELS.get(m, m),
+            color=COLORS.get(m, "#7f8c8d"),
+            alpha=0.85,
+        )
+        for j, v in enumerate(vals):
+            ax.text(
+                j + i * width, v + 2, f"{v:.0f}", ha="center", fontsize=8
+            )
+
+    ax.axhline(y=100, color="#2ecc71", linestyle="--", alpha=0.6, linewidth=1)
+    ax.text(len(lengths) - 0.5, 102, "100ms target", color="#2ecc71", fontsize=9)
+    ax.axhline(y=200, color="#f39c12", linestyle="--", alpha=0.6, linewidth=1)
+    ax.text(len(lengths) - 0.5, 202, "200ms good", color="#f39c12", fontsize=9)
+
+    ax.set_xticks([p + width for p in x_pos])
+    ax.set_xticklabels(lengths)
+    _apply_style(
+        plt,
+        ax,
+        "Time-to-First-Audio by Model and Text Length",
+        "Text length",
+        "TTFA (ms, streaming mode)",
+    )
+
+    path = str(output_dir / f"tts_ttfa.{fmt}")
+    fig.tight_layout()
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    return path
+
+
+def _chart_tts_jitter(plt, data: dict, output_dir: Path, fmt: str) -> str:
+    """TTS Chart 2: CDF of inter-chunk gaps."""
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    rows = data["jitter"]["results"]
+    models = ["kokoro", "orpheus-fp16", "orpheus-tq4"]
+
+    for m in models:
+        gaps = sorted(
+            r["p95_gap_ms"] for r in rows if r["model"] == m
+        )
+        if not gaps:
+            continue
+        percentiles = [100.0 * (i + 1) / len(gaps) for i in range(len(gaps))]
+        ax.plot(
+            gaps,
+            percentiles,
+            "o-",
+            label=LABELS.get(m, m),
+            color=COLORS.get(m, "#7f8c8d"),
+            linewidth=2,
+            markersize=6,
+        )
+
+    ax.axvline(x=50, color="#e74c3c", linestyle="--", alpha=0.5, linewidth=1)
+    ax.text(51, 5, "50ms smooth", color="#e74c3c", fontsize=9)
+
+    _apply_style(
+        plt,
+        ax,
+        "Streaming Audio Jitter Distribution",
+        "Inter-chunk gap (ms)",
+        "Percentile",
+    )
+
+    path = str(output_dir / f"tts_jitter.{fmt}")
+    fig.tight_layout()
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    return path
+
+
+def _chart_tts_concurrent(plt, data: dict, output_dir: Path, fmt: str) -> str:
+    """TTS Chart 3 (HERO): Concurrent streams per GPU."""
+    fig, ax = plt.subplots(figsize=(11, 7))
+
+    summary = data["concurrent"]["summary"]
+    gpus = list(summary.keys())
+    models = ["kokoro", "orpheus-fp16", "orpheus-tq4", "orpheus-tq3"]
+
+    y_pos = range(len(gpus))
+    height = 0.2
+
+    for i, m in enumerate(models):
+        vals = [summary[gpu].get(m, {}).get("max_under_budget", 0) for gpu in gpus]
+        bars = ax.barh(
+            [p + (i - 1.5) * height for p in y_pos],
+            vals,
+            height,
+            label=LABELS.get(m, m),
+            color=COLORS.get(m, "#7f8c8d"),
+            alpha=0.85,
+        )
+        for bar, v in zip(bars, vals, strict=False):
+            if v > 0:
+                ax.text(
+                    v + 1,
+                    bar.get_y() + bar.get_height() / 2,
+                    f"{v}",
+                    va="center",
+                    fontsize=9,
+                )
+
+    # Highlight TQ4/FP16 ratio on A100
+    if "A100" in summary:
+        tq4 = summary["A100"].get("orpheus-tq4", {}).get("max_under_budget", 0)
+        fp16 = summary["A100"].get("orpheus-fp16", {}).get("max_under_budget", 0)
+        if fp16 > 0:
+            ratio = tq4 / fp16
+            ax.text(
+                max(
+                    summary["A100"].get(m, {}).get("max_under_budget", 0)
+                    for m in models
+                )
+                * 0.6,
+                gpus.index("A100"),
+                f"TQ4 = {ratio:.1f}x FP16",
+                fontsize=13,
+                color=COLORS["orpheus-tq4"],
+                fontweight="bold",
+            )
+
+    ax.set_yticks(list(y_pos))
+    ax.set_yticklabels(gpus)
+    _apply_style(
+        plt,
+        ax,
+        "Concurrent TTS Streams per GPU (p95 TTFA ≤ 400ms)",
+        "Max concurrent streams",
+        "GPU",
+    )
+
+    path = str(output_dir / f"tts_concurrent_streams.{fmt}")
+    fig.tight_layout()
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    return path
+
+
+def _chart_tts_quality(plt, data: dict, output_dir: Path, fmt: str) -> str:
+    """TTS Chart 4: PESQ/STOI by model/compression."""
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    rows = data["quality"]["results"]
+    labels = [f"{r['model']}-{r['compression']}" for r in rows]
+    pesq = [r["pesq_score"] for r in rows]
+    stoi = [r["stoi_score"] for r in rows]
+
+    x_pos = range(len(labels))
+    width = 0.4
+
+    ax.bar(
+        [p - width / 2 for p in x_pos],
+        pesq,
+        width,
+        label="PESQ",
+        color=COLORS["orpheus-tq4"],
+        alpha=0.85,
+    )
+    ax2 = ax.twinx()
+    ax2.bar(
+        [p + width / 2 for p in x_pos],
+        stoi,
+        width,
+        label="STOI",
+        color=COLORS["orpheus-tq3"],
+        alpha=0.85,
+    )
+
+    for j, v in enumerate(pesq):
+        ax.text(j - width / 2, v + 0.02, f"{v:.2f}", ha="center", fontsize=8)
+    for j, v in enumerate(stoi):
+        ax2.text(j + width / 2, v + 0.005, f"{v:.3f}", ha="center", fontsize=8)
+
+    ax.set_xticks(list(x_pos))
+    ax.set_xticklabels(labels, rotation=15, ha="right")
+    ax.set_ylim(2.8, 4.2)
+    ax2.set_ylim(0.85, 1.0)
+    ax.set_ylabel("PESQ", color=COLORS["orpheus-tq4"])
+    ax2.set_ylabel("STOI", color=COLORS["orpheus-tq3"])
+    ax.set_title(
+        "TTS Quality vs KV Compression Level",
+        fontsize=14,
+        fontweight="bold",
+        pad=12,
+    )
+    ax.spines["top"].set_visible(False)
+    ax2.spines["top"].set_visible(False)
+
+    # Merge legends
+    lines, lbls = ax.get_legend_handles_labels()
+    lines2, lbls2 = ax2.get_legend_handles_labels()
+    ax.legend(lines + lines2, lbls + lbls2, loc="upper right", fontsize=10)
+
+    path = str(output_dir / f"tts_quality.{fmt}")
+    fig.tight_layout()
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    return path
+
+
+def _chart_tts_speaker_cache(plt, data: dict, output_dir: Path, fmt: str) -> str:
+    """TTS Chart 5: Cold vs warm latency by voice count."""
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    rows = data["cache"]["results"]
+    voice_counts = [r["voice_count"] for r in rows]
+    cold = [r["avg_cold_latency_ms"] for r in rows]
+    warm = [r["avg_warm_latency_ms"] for r in rows]
+    avg = [r["avg_latency_ms"] for r in rows]
+    hit_rate = [r["cache_hit_rate"] for r in rows]
+
+    x_pos = range(len(voice_counts))
+    width = 0.28
+
+    ax.bar(
+        [p - width for p in x_pos],
+        cold,
+        width,
+        label="Cold (miss)",
+        color=COLORS["fp16"],
+        alpha=0.85,
+    )
+    ax.bar(
+        list(x_pos),
+        warm,
+        width,
+        label="Warm (hit)",
+        color=COLORS["tq4"],
+        alpha=0.85,
+    )
+    ax.bar(
+        [p + width for p in x_pos],
+        avg,
+        width,
+        label="Avg observed",
+        color=COLORS["tq3"],
+        alpha=0.85,
+    )
+
+    for j, r in enumerate(hit_rate):
+        ax.text(
+            j,
+            max(cold) * 1.02,
+            f"hit={r:.0%}",
+            ha="center",
+            fontsize=9,
+            color=COLORS["tq4"],
+        )
+
+    ax.set_xticks(list(x_pos))
+    ax.set_xticklabels([str(v) for v in voice_counts])
+    _apply_style(
+        plt,
+        ax,
+        "Speaker Cache Hit Impact on Latency",
+        "Unique voices in workload",
+        "Latency (ms)",
+    )
+
+    path = str(output_dir / f"tts_speaker_cache.{fmt}")
+    fig.tight_layout()
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    return path
+
+
+def _chart_cross_modality_hero(plt, data: dict, output_dir: Path, fmt: str) -> str:
+    """THE cross-modality hero chart: voice-agent sessions per GPU.
+
+    Each voice agent session requires STT + LLM + TTS co-hosted. Compares
+    cloud API baseline (per-session cost, no concurrency limit), self-hosted
+    FP16, and self-hosted with VoiceQuant compression.
+    """
+    fig, ax = plt.subplots(figsize=(11, 7))
+
+    # Model per-session footprint (MB) estimates:
+    # STT: faster-whisper large ~1500 MB, per session ~40 MB
+    # LLM: Qwen2.5-7B-AWQ ~4 GB model, per-session KV at 4K: fp16 ~320 MB, tq4 ~60 MB
+    # TTS: Orpheus 3B ~5.6 GB, per session fp16 720 MB, tq4 310 MB
+    gpus = ["T4", "A10G", "A100"]
+    mem_gb = {"T4": 16, "A10G": 24, "A100": 80}
+    # Fixed model weights (MB) shared across sessions
+    base_fp16 = 1500 + 4000 + 5600
+    base_vq = 1500 + 4000 + 5600
+
+    per_session = {
+        "self-hosted": 40 + 320 + 720,  # STT + LLM-FP16 + TTS-FP16
+        "voicequant": 40 + 60 + 310,  # STT + LLM-TQ4 + TTS-TQ4
+    }
+
+    # Cloud has no GPU constraint. Use a nominal "100" to indicate
+    # elastic-but-expensive.
+    cloud_sessions = dict.fromkeys(gpus, 100)
+
+    self_hosted_sessions: dict[str, int] = {}
+    voicequant_sessions: dict[str, int] = {}
+    for g in gpus:
+        self_hosted_sessions[g] = max(
+            0, (mem_gb[g] * 1024 - base_fp16) // per_session["self-hosted"]
+        )
+        voicequant_sessions[g] = max(
+            0, (mem_gb[g] * 1024 - base_vq) // per_session["voicequant"]
+        )
+
+    x_pos = range(len(gpus))
+    width = 0.26
+
+    ax.bar(
+        [p - width for p in x_pos],
+        [cloud_sessions[g] for g in gpus],
+        width,
+        label="Cloud API (elastic, $$$)",
+        color=COLORS["cloud"],
+        alpha=0.85,
+        hatch="//",
+    )
+    ax.bar(
+        list(x_pos),
+        [self_hosted_sessions[g] for g in gpus],
+        width,
+        label="Self-hosted FP16",
+        color=COLORS["self-hosted"],
+        alpha=0.85,
+    )
+    bars_vq = ax.bar(
+        [p + width for p in x_pos],
+        [voicequant_sessions[g] for g in gpus],
+        width,
+        label="Self-hosted + VoiceQuant",
+        color=COLORS["voicequant"],
+        alpha=0.90,
+    )
+
+    for bar, g in zip(bars_vq, gpus, strict=False):
+        vq = voicequant_sessions[g]
+        fp = max(1, self_hosted_sessions[g])
+        mult = vq / fp
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 2,
+            f"{vq} ({mult:.1f}x)",
+            ha="center",
+            fontsize=10,
+            fontweight="bold",
+            color=COLORS["voicequant"],
+        )
+
+    mem_labels = [f"{g} ({mem_gb[g]}GB)" for g in gpus]
+    ax.set_xticks(list(x_pos))
+    ax.set_xticklabels(mem_labels)
+    _apply_style(
+        plt,
+        ax,
+        "Voice Agent Sessions per GPU: Cloud vs Self-Hosted vs VoiceQuant",
+        "GPU tier",
+        "Concurrent voice-agent sessions (STT + LLM + TTS)",
+    )
+
+    path = str(output_dir / f"cross_modality_hero.{fmt}")
+    fig.tight_layout()
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    return path
+
+
+def generate_tts_charts(
+    output_dir: str = "./charts",
+    fmt: str = "png",
+    include_hero: bool = True,
+) -> list[str]:
+    """Generate the 5 TTS charts plus (optionally) the hero chart."""
+    plt = _require_matplotlib()
+    out = Path(output_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    img_fmt = "png" if fmt == "html" else fmt
+
+    data = _compute_tts_data()
+
+    funcs = [
+        _chart_tts_ttfa,
+        _chart_tts_jitter,
+        _chart_tts_concurrent,
+        _chart_tts_quality,
+        _chart_tts_speaker_cache,
+    ]
+    if include_hero:
+        funcs.append(_chart_cross_modality_hero)
+
+    paths: list[str] = []
+    for func in funcs:
+        path = func(plt, data, out, img_fmt)
+        paths.append(path)
+        console.print(f"  [green]Saved: {path}[/green]")
+
+    return paths
+
+
 def generate_analytical_charts(
     output_dir: str = "./charts",
     fmt: str = "png",
@@ -573,6 +1037,32 @@ def generate_charts(
     """
     # For now, use analytical data (benchmark result integration can be added later)
     return generate_analytical_charts(output_dir, fmt)
+
+
+def generate_all_charts(
+    output_dir: str = "./charts",
+    fmt: str = "png",
+) -> list[str]:
+    """Generate LLM + TTS + cross-modality hero charts."""
+    paths = generate_analytical_charts(output_dir=output_dir, fmt=fmt)
+    paths.extend(generate_tts_charts(output_dir=output_dir, fmt=fmt, include_hero=True))
+    return paths
+
+
+def generate_charts_by_modality(
+    modality: str,
+    output_dir: str = "./charts",
+    fmt: str = "png",
+) -> list[str]:
+    """Route visualize command by modality."""
+    modality = (modality or "all").lower()
+    if modality in {"llm", "kv", "compression"}:
+        return generate_analytical_charts(output_dir=output_dir, fmt=fmt)
+    if modality == "tts":
+        return generate_tts_charts(output_dir=output_dir, fmt=fmt, include_hero=False)
+    if modality in {"all", "cross"}:
+        return generate_all_charts(output_dir=output_dir, fmt=fmt)
+    raise ValueError(f"Unknown modality: {modality}")
 
 
 def _generate_html_report(

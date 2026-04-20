@@ -15,6 +15,8 @@ class TTSConfig(BaseModel):
     speaker_cache_size: int = Field(default=50)
     output_format: str = Field(default="wav")
     max_text_length: int = Field(default=4096)
+    tq_bits: int = Field(default=4, description="Orpheus-only: TurboQuant bits")
+    tq_enabled: bool = Field(default=True, description="Orpheus-only: enable KV compression")
 
     @model_validator(mode="after")
     def _resolve_device(self):
