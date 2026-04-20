@@ -55,13 +55,27 @@ tts = [
     "soundfile>=0.12.0",
     "numpy>=1.24.0",
 ]
+# Orpheus TTS (LLaMA-backbone model with TurboQuant KV compression).
+# phonemizer requires espeak-ng as a system dependency; Docker templates
+# handle that via apt-get install espeak-ng.
+tts-orpheus = [
+    "orpheus-tts>=0.1.0",
+    "phonemizer>=3.0.0",
+    "torch>=2.0.0",
+    "transformers>=4.40.0",
+    "soundfile>=0.12.0",
+    "numpy>=1.24.0",
+]
+tts-all = [
+    "voicequant[tts,tts-orpheus]",
+]
 modal = ["modal>=0.70.0"]
 runpod = ["runpod>=1.7.0"]
 voice = [
     "voicequant[stt,tts]",
 ]
 all = [
-    "voicequant[serve,bench,stt,tts,modal]",
+    "voicequant[serve,bench,stt,tts,tts-orpheus,modal]",
 ]
 
 [project.scripts]

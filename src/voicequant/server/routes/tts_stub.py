@@ -19,3 +19,16 @@ async def speech_stub():
             }
         },
     )
+
+
+@router.post("/audio/speech/stream")
+async def speech_stream_stub():
+    return JSONResponse(
+        status_code=501,
+        content={
+            "error": {
+                "message": "TTS modality not installed. Install with pip install voicequant[tts]",
+                "type": "not_implemented",
+            }
+        },
+    )

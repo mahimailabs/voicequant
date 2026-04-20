@@ -363,6 +363,89 @@ def _generate_gpu_recommendations() -> str:
     return "\n".join(lines)
 
 
+def _generate_tts_section(
+    results: dict[str, dict[str, Any]], present: list[str]
+) -> str:
+    """Generate the TTS benchmark section."""
+    lines = [
+        _section_header("TTS (Text-to-Speech)"),
+        "Streaming synthesis, Orpheus KV compression, and per-GPU concurrency.\n",
+    ]
+
+    if "tts_ttfa" in present:
+        ttfa = results["tts_ttfa"]
+        lines.append("### Time-to-First-Audio\n")
+        lines.append("| Model | Mode | Text length | TTFA (ms) |")
+        lines.append("|-------|------|-------------|-----------|")
+        for r in ttfa.get("results", []):
+            lines.append(
+                f"| {r['model']} | {r['mode']} | {r['text_length']} | {r['ttfa_ms']} |"
+            )
+        lines.append("")
+
+    if "tts_concurrent" in present:
+        conc = results["tts_concurrent"]
+        lines.append("### Concurrent Voice Streams per GPU (headline)\n")
+        ratio = conc.get("headline_ratio_tq4_over_fp16", 0.0)
+        lines.append(
+            f"Orpheus TQ4 sustains **{ratio}x** the concurrent sessions of "
+            f"Orpheus FP16 on A100 under a "
+            f"{conc.get('latency_budget_ms', 400)} ms p95 TTFA budget.\n"
+        )
+        lines.append("| GPU | Model | Max under budget | Hardware cap |")
+        lines.append("|-----|-------|------------------|--------------|")
+        for gpu, by_model in conc.get("summary", {}).items():
+            for mname, stats in by_model.items():
+                lines.append(
+                    f"| {gpu} | {mname} | {stats['max_under_budget']} | "
+                    f"{stats['hardware_cap']} |"
+                )
+        lines.append("")
+
+    if "tts_mos_quality" in present:
+        quality = results["tts_mos_quality"]
+        lines.append("### Audio Quality (PESQ / STOI)\n")
+        lines.append("| Model | Compression | PESQ | STOI |")
+        lines.append("|-------|-------------|------|------|")
+        for r in quality.get("results", []):
+            lines.append(
+                f"| {r['model']} | {r['compression']} | {r['pesq_score']} | "
+                f"{r['stoi_score']} |"
+            )
+        lines.append("")
+
+    if "tts_streaming_jitter" in present:
+        jitter = results["tts_streaming_jitter"]
+        lines.append("### Streaming Jitter (inter-chunk gaps)\n")
+        lines.append(
+            "| Model | Chunk size (samples) | p50 (ms) | p95 (ms) | Max (ms) |"
+        )
+        lines.append("|-------|----------------------|----------|----------|----------|")
+        for r in jitter.get("results", []):
+            lines.append(
+                f"| {r['model']} | {r['chunk_size']} | {r['p50_gap_ms']} | "
+                f"{r['p95_gap_ms']} | {r['max_gap_ms']} |"
+            )
+        lines.append("")
+
+    if "tts_speaker_cache_hit" in present:
+        cache = results["tts_speaker_cache_hit"]
+        lines.append("### Speaker Cache Hit Impact\n")
+        lines.append(
+            "| Unique voices | Hit rate | Cold (ms) | Warm (ms) | Avg (ms) |"
+        )
+        lines.append("|---------------|----------|-----------|-----------|----------|")
+        for r in cache.get("results", []):
+            lines.append(
+                f"| {r['voice_count']} | {r['cache_hit_rate']:.2%} | "
+                f"{r['avg_cold_latency_ms']} | {r['avg_warm_latency_ms']} | "
+                f"{r['avg_latency_ms']} |"
+            )
+        lines.append("")
+
+    return "\n".join(lines)
+
+
 def generate_report(
     results: dict[str, dict[str, Any]],
     output_path: str,
@@ -397,6 +480,18 @@ def generate_report(
 
     if "tool_calling" in results and "error" not in results["tool_calling"]:
         sections.append(_generate_tool_calling_section(results["tool_calling"]))
+
+    # TTS scenarios (M5)
+    tts_keys = [
+        "tts_ttfa",
+        "tts_streaming_jitter",
+        "tts_mos_quality",
+        "tts_concurrent",
+        "tts_speaker_cache_hit",
+    ]
+    tts_present = [k for k in tts_keys if k in results and "error" not in results[k]]
+    if tts_present:
+        sections.append(_generate_tts_section(results, tts_present))
 
     if "multi_turn" in results and "error" not in results["multi_turn"]:
         summary = results["multi_turn"].get("summary", {})
