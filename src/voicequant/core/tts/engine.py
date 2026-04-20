@@ -123,8 +123,12 @@ class TTSEngine:
 
     def list_voices(self) -> list[dict[str, str]]:
         """Return available voice identifiers for the active backend."""
-        if self._backend == "orpheus" and self._orpheus is not None:
-            return self._orpheus.list_voices()
+        if self._backend == "orpheus":
+            if self._orpheus is not None:
+                return self._orpheus.list_voices()
+            from voicequant.core.tts.orpheus_adapter import ORPHEUS_VOICES
+
+            return [dict(v) for v in ORPHEUS_VOICES]
         return list(KOKORO_VOICES)
 
     @property
@@ -299,6 +303,16 @@ class TTSEngine:
 
     def shutdown(self) -> None:
         with self._lock:
+            if self._orpheus is not None:
+                cleanup = getattr(self._orpheus, "shutdown", None) or getattr(
+                    self._orpheus, "close", None
+                )
+                if callable(cleanup):
+                    try:
+                        cleanup()
+                    except Exception:
+                        pass
+                self._orpheus = None
             self._model = None
             self._model_loaded = False
             if self._speaker_cache is not None:

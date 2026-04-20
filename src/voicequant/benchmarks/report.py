@@ -414,6 +414,35 @@ def _generate_tts_section(
             )
         lines.append("")
 
+    if "tts_streaming_jitter" in present:
+        jitter = results["tts_streaming_jitter"]
+        lines.append("### Streaming Jitter (inter-chunk gaps)\n")
+        lines.append(
+            "| Model | Chunk size (samples) | p50 (ms) | p95 (ms) | Max (ms) |"
+        )
+        lines.append("|-------|----------------------|----------|----------|----------|")
+        for r in jitter.get("results", []):
+            lines.append(
+                f"| {r['model']} | {r['chunk_size']} | {r['p50_gap_ms']} | "
+                f"{r['p95_gap_ms']} | {r['max_gap_ms']} |"
+            )
+        lines.append("")
+
+    if "tts_speaker_cache_hit" in present:
+        cache = results["tts_speaker_cache_hit"]
+        lines.append("### Speaker Cache Hit Impact\n")
+        lines.append(
+            "| Unique voices | Hit rate | Cold (ms) | Warm (ms) | Avg (ms) |"
+        )
+        lines.append("|---------------|----------|-----------|-----------|----------|")
+        for r in cache.get("results", []):
+            lines.append(
+                f"| {r['voice_count']} | {r['cache_hit_rate']:.2%} | "
+                f"{r['avg_cold_latency_ms']} | {r['avg_warm_latency_ms']} | "
+                f"{r['avg_latency_ms']} |"
+            )
+        lines.append("")
+
     return "\n".join(lines)
 
 

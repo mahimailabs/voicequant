@@ -19,10 +19,12 @@ _WARM_LATENCY_MS = 120.0
 def _cache_hit_rate(unique_voices: int, cache_size: int = _CACHE_SIZE) -> float:
     """Hit rate assuming uniform access over a round of N requests.
 
-    When unique_voices <= cache_size every voice stays resident; rate
-    approaches (N - unique_voices) / N for large N. Beyond cache size
-    we get LRU churn — approximated as cache_size / unique_voices.
+    A single-voice workload warms after the first miss so subsequent
+    requests hit the cache — treat it as a 1.0 hit rate. Beyond cache
+    size we get LRU churn — approximated as cache_size / unique_voices.
     """
+    if unique_voices == 1:
+        return 1.0
     if unique_voices <= cache_size:
         return max(0.0, 1.0 - 1.0 / max(1, unique_voices))
     return cache_size / unique_voices

@@ -309,7 +309,7 @@ def run_benchmarks(
 
         t0 = time.perf_counter()
         try:
-            if scenario_name == "concurrent":
+            if scenario_name in ("concurrent", "tts_concurrent"):
                 result = instance.run(
                     model=model, config=config, max_sessions=max_sessions
                 )

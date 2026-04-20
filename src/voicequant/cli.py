@@ -124,7 +124,14 @@ def bench(
     if viz:
         from voicequant.benchmarks.visualize import generate_charts_by_modality
 
-        viz_mod = "all" if all_scenarios else (modality or "llm")
+        if all_scenarios:
+            viz_mod = "all"
+        elif modality:
+            viz_mod = modality
+        elif scenarios and any(s.startswith("tts_") for s in scenarios):
+            viz_mod = "tts"
+        else:
+            viz_mod = "llm"
         generate_charts_by_modality(modality=viz_mod, output_dir=chart_output)
 
 
@@ -294,6 +301,11 @@ def tts_speak(
 
     if text == "-":
         text = sys.stdin.read()
+
+    # "orpheus" is a friendly shorthand — expand to the canonical HF id so
+    # the adapter knows what weights to load.
+    if model == "orpheus":
+        model = "canopylabs/orpheus-3b-0.1-ft"
 
     cfg = TTSConfig(
         model_name=model,

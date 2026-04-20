@@ -70,11 +70,12 @@ def build_router(get_engine) -> APIRouter:
         """Map a request format to a streaming-safe payload format.
 
         Streaming responses must use raw, chunk-safe formats. WAV has a
-        header that describes total length so we downgrade to PCM.
+        header that describes total length so we downgrade it to PCM,
+        and any other/unknown format also falls back to PCM.
         """
         low = (fmt or "pcm").lower()
-        if low in {"pcm", "wav"}:
-            return low
+        if low == "pcm":
+            return "pcm"
         return "pcm"
 
     async def _sse_generator(sync_stream):
@@ -114,20 +115,27 @@ def build_router(get_engine) -> APIRouter:
         if engine is None:
             raise HTTPException(status_code=503, detail="TTS engine not ready")
 
-        from voicequant.core.tts.streaming import (
-            StreamingSynthesizer,
-            TTSStreamingConfig,
-        )
-
         fmt = _streaming_format(request.response_format)
         accept = (http_request.headers.get("accept") or "").lower()
         use_sse = "text/event-stream" in accept
 
         try:
+            from voicequant.core.tts.streaming import (
+                StreamingSynthesizer,
+                TTSStreamingConfig,
+            )
+
             synth = StreamingSynthesizer(
                 engine, TTSStreamingConfig(output_format=fmt)
             )
             chunk_iter = synth.stream(request.input, voice=request.voice)
+            # Pull the first chunk eagerly so generator-start errors surface
+            # here and get mapped to 501/500 instead of streaming a half-open
+            # response.
+            try:
+                first_chunk = next(chunk_iter)
+            except StopIteration:
+                first_chunk = None
         except ImportError as e:
             raise HTTPException(status_code=501, detail=str(e)) from e
         except Exception as e:
@@ -135,16 +143,23 @@ def build_router(get_engine) -> APIRouter:
                 status_code=500, detail=f"Synthesis failed: {e}"
             ) from e
 
+        def _prepend_first(first, rest):
+            if first is not None:
+                yield first
+            yield from rest
+
+        combined = _prepend_first(first_chunk, chunk_iter)
+
         if use_sse:
             return StreamingResponse(
-                _sse_generator(chunk_iter),
+                _sse_generator(combined),
                 media_type="text/event-stream",
                 headers={"Cache-Control": "no-cache"},
             )
 
         media_type = _CONTENT_TYPES.get(fmt, "application/octet-stream")
         return StreamingResponse(
-            _raw_generator(chunk_iter),
+            _raw_generator(combined),
             media_type=media_type,
             headers={"Cache-Control": "no-cache"},
         )

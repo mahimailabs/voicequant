@@ -100,6 +100,7 @@ class ConcurrentTTSScenario:
                     if r["gpu"] == gpu
                     and r["model"] == m["name"]
                     and r["p95_ttfa_ms"] <= _LATENCY_BUDGET_MS
+                    and r["concurrency"] <= r["max_concurrency"]
                 ]
                 best_n = max((r["concurrency"] for r in rows), default=0)
                 summary.setdefault(gpu, {})[m["name"]] = {

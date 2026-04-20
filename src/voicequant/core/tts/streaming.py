@@ -19,7 +19,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from voicequant.core.tts.audio import float32_to_pcm, float32_to_wav
+from voicequant.core.tts.audio import float32_to_pcm
 
 
 class TTSStreamingConfig(BaseModel):
@@ -45,11 +45,17 @@ class StreamingChunk:
 
 
 def _encode_chunk(samples: Any, sample_rate: int, output_format: str) -> bytes:
+    """Encode a chunk for streaming.
+
+    WAV carries a header describing the full file length, so emitting one
+    WAV-framed chunk per piece produces an invalid concatenated stream.
+    We downgrade "wav" to raw PCM for streaming so concatenation works.
+    """
     fmt = output_format.lower()
     if fmt == "pcm":
         return float32_to_pcm(samples, sample_rate)
     if fmt == "wav":
-        return float32_to_wav(samples, sample_rate)
+        return float32_to_pcm(samples, sample_rate)
     raise ValueError(f"Unsupported streaming format: {output_format}")
 
 
@@ -156,7 +162,11 @@ class StreamingSynthesizer:
         sample_rate: int,
         t0: float,
     ) -> Generator[StreamingChunk, None, None]:
-        """Forward samples from a backend generator into StreamingChunks."""
+        """Forward samples from a backend generator into StreamingChunks.
+
+        Uses one-chunk lookahead so the real last chunk is marked
+        ``is_final=True`` and we never emit a zero-sample terminator.
+        """
         import numpy as np
 
         buffer: list[Any] = []
@@ -165,18 +175,11 @@ class StreamingSynthesizer:
         first_emitted = False
         min_chunk = max(1, int(self.config.min_chunk_size_samples))
         step = max(1, int(self.config.chunk_size_samples))
+        pending: StreamingChunk | None = None
 
-        def _flush(is_final: bool) -> StreamingChunk | None:
-            nonlocal idx, first_emitted, buffered
-            if buffered == 0 and not is_final:
-                return None
-            if buffer:
-                arr = np.concatenate([np.asarray(x, dtype=np.float32) for x in buffer])
-            else:
-                arr = np.zeros(0, dtype=np.float32)
-            buffer.clear()
-            buffered = 0
-            chunk = self._make_chunk(arr, sample_rate, idx, is_final, t0)
+        def _make_pending(samples_arr: Any) -> StreamingChunk:
+            nonlocal idx, first_emitted
+            chunk = self._make_chunk(samples_arr, sample_rate, idx, False, t0)
             if not first_emitted:
                 self._last_ttfa_ms = chunk.timestamp_ms
                 first_emitted = True
@@ -200,19 +203,27 @@ class StreamingSynthesizer:
                 buffered = int(tail.size)
                 if tail.size > 0:
                     buffer.append(tail)
-                chunk = self._make_chunk(
-                    head, sample_rate, idx, False, t0
-                )
-                if not first_emitted:
-                    self._last_ttfa_ms = chunk.timestamp_ms
-                    first_emitted = True
-                idx += 1
-                yield chunk
+                new_chunk = _make_pending(head)
+                if pending is not None:
+                    yield pending
+                pending = new_chunk
                 target = step
 
-        final = _flush(True)
-        if final is not None:
-            yield final
+        # Any residual samples become a final chunk.
+        if buffered > 0:
+            residual = np.concatenate(
+                [np.asarray(x, dtype=np.float32) for x in buffer]
+            )
+            buffer.clear()
+            buffered = 0
+            tail_chunk = _make_pending(residual)
+            if pending is not None:
+                yield pending
+            pending = tail_chunk
+
+        if pending is not None:
+            pending.is_final = True
+            yield pending
 
         self._last_total_chunks = idx
         self._last_total_ms = (time.perf_counter() - t0) * 1000.0

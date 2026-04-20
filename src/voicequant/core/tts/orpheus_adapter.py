@@ -23,6 +23,18 @@ from voicequant.core.llm.engine import TurboQuantEngine
 from voicequant.core.tts.engine import SynthesisResult
 from voicequant.core.tts.streaming import StreamingChunk, TTSStreamingConfig
 
+# Static voice registry — safe to expose before the model is loaded.
+ORPHEUS_VOICES: list[dict[str, str]] = [
+    {"voice_id": "tara", "description": "Orpheus default voice"},
+    {"voice_id": "leah", "description": "Orpheus female voice"},
+    {"voice_id": "jess", "description": "Orpheus female voice"},
+    {"voice_id": "leo", "description": "Orpheus male voice"},
+    {"voice_id": "dan", "description": "Orpheus male voice"},
+    {"voice_id": "mia", "description": "Orpheus female voice"},
+    {"voice_id": "zac", "description": "Orpheus male voice"},
+    {"voice_id": "zoe", "description": "Orpheus female voice"},
+]
+
 
 class OrpheusConfig(BaseModel):
     """Configuration for the Orpheus TTS backend."""
@@ -127,7 +139,8 @@ class OrpheusAdapter:
 
         import torch
 
-        inputs = self._tokenizer(text, return_tensors="pt").to(self.config.device)
+        prompt = f"{voice}: {text}" if voice else text
+        inputs = self._tokenizer(prompt, return_tensors="pt").to(self.config.device)
         position_ids = None
         past_key_values = None
         input_ids = inputs["input_ids"]
@@ -159,9 +172,9 @@ class OrpheusAdapter:
                 [[seq_len + n_generated]], device=self.config.device
             )
             n_generated += 1
-            yield token_id
             if self._is_eos(token_id):
                 break
+            yield token_id
 
     def _sample(self, logits: Any) -> Any:
         """Top-p temperature sampling."""
@@ -207,6 +220,8 @@ class OrpheusAdapter:
             float32_to_pcm,
             float32_to_wav,
             get_audio_duration,
+            wav_to_mp3,
+            wav_to_opus,
         )
 
         t0 = time.time()
@@ -218,8 +233,14 @@ class OrpheusAdapter:
             audio_bytes = float32_to_wav(samples, self.sample_rate)
         elif fmt == "pcm":
             audio_bytes = float32_to_pcm(samples, self.sample_rate)
+        elif fmt == "mp3":
+            audio_bytes = wav_to_mp3(float32_to_wav(samples, self.sample_rate))
+        elif fmt == "opus":
+            audio_bytes = wav_to_opus(float32_to_wav(samples, self.sample_rate))
         else:
-            raise ValueError(f"Orpheus adapter supports wav/pcm, got {fmt}")
+            raise ValueError(
+                f"Orpheus adapter supports wav/pcm/mp3/opus, got {fmt}"
+            )
 
         duration = get_audio_duration(audio_bytes, fmt, self.sample_rate)
         self._latency_sum_ms += (time.time() - t0) * 1000.0
@@ -300,28 +321,26 @@ class OrpheusAdapter:
     # --- Metrics / introspection ---
 
     def get_compression_stats(self) -> dict[str, Any] | None:
-        """Return KV compression metrics or None if TQ disabled."""
+        """Return KV compression metrics or None if TQ disabled.
+
+        ``cosine_similarity`` is only reported when it has actually been
+        measured — callers must tolerate a missing or ``None`` value.
+        """
         if self._tq_engine is None:
             return None
-        return {
+        stats: dict[str, Any] = {
             "compression_ratio": float(self._last_ratio),
             "kv_cache_bytes_compressed": int(self._last_tq_bytes),
             "kv_cache_bytes_uncompressed": int(self._last_fp16_bytes),
-            "cosine_similarity": float(self._last_cosine or 0.99),
+            "cosine_similarity": (
+                float(self._last_cosine) if self._last_cosine else None
+            ),
             "tq_bits": int(self.config.tq_bits),
         }
+        return stats
 
     def list_voices(self) -> list[dict[str, str]]:
-        return [
-            {"voice_id": "tara", "description": "Orpheus default voice"},
-            {"voice_id": "leah", "description": "Orpheus female voice"},
-            {"voice_id": "jess", "description": "Orpheus female voice"},
-            {"voice_id": "leo", "description": "Orpheus male voice"},
-            {"voice_id": "dan", "description": "Orpheus male voice"},
-            {"voice_id": "mia", "description": "Orpheus female voice"},
-            {"voice_id": "zac", "description": "Orpheus male voice"},
-            {"voice_id": "zoe", "description": "Orpheus female voice"},
-        ]
+        return [dict(v) for v in ORPHEUS_VOICES]
 
     def shutdown(self) -> None:
         self._model = None

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+# Bit widths the TurboQuant engine supports end-to-end.
+_SUPPORTED_TQ_BITS = (2, 3, 4)
 
 
 class TTSConfig(BaseModel):
@@ -17,6 +20,15 @@ class TTSConfig(BaseModel):
     max_text_length: int = Field(default=4096)
     tq_bits: int = Field(default=4, description="Orpheus-only: TurboQuant bits")
     tq_enabled: bool = Field(default=True, description="Orpheus-only: enable KV compression")
+
+    @field_validator("tq_bits")
+    @classmethod
+    def _validate_tq_bits(cls, v: int) -> int:
+        if v not in _SUPPORTED_TQ_BITS:
+            raise ValueError(
+                f"tq_bits must be one of {_SUPPORTED_TQ_BITS}; got {v}"
+            )
+        return v
 
     @model_validator(mode="after")
     def _resolve_device(self):
